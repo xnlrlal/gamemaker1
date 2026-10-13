@@ -152,11 +152,18 @@ class CooldownAndSpiritTests(unittest.TestCase):
             blocked.append(not combat.skill_usable(st, p, "smash"))
         self.assertEqual(blocked, [True, True, True, False])   # 2~4라운드 사용 불가, 5라운드 가능
 
-    def test_cooldown_zero_skill_is_reusable_next_round(self):
+    def test_cooldown_zero_skill_has_no_restriction(self):
         db, p, e, st = fresh()
         combat.do_action(st, p, "slash")
-        combat.end_of_round(st)
-        self.assertTrue(combat.skill_usable(st, p, "slash"))
+        self.assertTrue(combat.skill_usable(st, p, "slash"))     # 같은 라운드에도 다시 가능(행동 횟수·영혼력만 제한)
+
+    def test_extra_actions_let_fast_monster_repeat_cooldown_zero_skill(self):
+        db, p, e, st = fresh("ghoul")
+        e["skills"] = ["slash"]
+        e["action_gauge"] = 1.0                                   # 이번 라운드 추가 행동 1회 확보
+        spirit = e["spirit"]
+        combat.take_turn(st, e)
+        self.assertEqual(spirit - e["spirit"], 2 * db["skills"]["slash"]["cost"])
 
     def test_spirit_gates_skills(self):
         db, p, e, st = fresh()
@@ -285,6 +292,61 @@ class PartDamageTests(unittest.TestCase):
         before = eff_stat(p, "regen")
         combat._damage_part(st, p)
         self.assertEqual(eff_stat(p, "regen"), before - 2)       # 샌들 자연재생 +2 소실
+
+
+class MonsterSkillTests(unittest.TestCase):
+    def test_every_monster_has_valid_skills_and_ai(self):
+        for mid in BASE_DB["monsters"]:
+            m = make_enemy(BASE_DB, mid)
+            self.assertTrue(m["skills"], mid)
+            for sid in m["skills"]:
+                self.assertIn(sid, BASE_DB["skills"])
+            self.assertIn(m["ai"], combat.POLICIES)
+
+    def test_player_only_gets_the_four_basic_skills(self):
+        p = make_player(BASE_DB)
+        self.assertEqual(sorted(p["skills"]), ["guard", "pierce", "slash", "smash"])
+
+    def test_ranged_monsters_use_shot_skills(self):
+        for mid in ("goblin_archer", "skeleton_archer"):
+            self.assertTrue(make_enemy(BASE_DB, mid)["ranged"])
+            self.assertIn("shoot", make_enemy(BASE_DB, mid)["skills"])
+
+    def test_on_hit_chance_zero_never_and_one_always_applies(self):
+        db = copy.deepcopy(BASE_DB)
+        db["rules"]["hit"].update({"base": 1.0, "min": 1.0, "max": 1.0})
+        db["rules"]["part_damage"]["chance"] = 0.0
+        db["skills"]["bash"] = {"name_ko": "t", "kind": "attack", "power": 1, "cost": 0, "cooldown": 0,
+                                "on_hit": [{"status": "bleed", "chance": 1.0}]}
+        db, p, e, st = fresh("gnome", db=db)
+        combat.resolve_attack(st, p, e, "bash")
+        self.assertIn("bleed", e["status"])
+        db["skills"]["bash"]["on_hit"][0]["chance"] = 0.0001
+        db2, p2, e2, st2 = fresh("gnome", db=db, seed=3)
+        combat.resolve_attack(st2, p2, e2, "bash")
+        self.assertNotIn("bleed", e2["status"])
+
+    def test_invalid_on_hit_chance_rejected(self):
+        bad = copy.deepcopy(BASE_DB)
+        bad["skills"]["bite"]["on_hit"][0]["chance"] = 1.5
+        with self.assertRaises(DbError):
+            validate_db(bad)
+
+    def test_guard_when_hurt_policy(self):
+        db, p, e, st = fresh("skeleton_warrior")
+        self.assertEqual(e["ai"], "guard_when_hurt")
+        self.assertEqual(combat.choose_skill(st, e), "slash")         # 건강할 땐 공격
+        e["hp"] = 30.0
+        self.assertEqual(combat.choose_skill(st, e), "guard")         # 다치면 방어
+        e["cooldowns"]["guard"] = 2
+        self.assertEqual(combat.choose_skill(st, e), "slash")         # 방어가 쿨타임이면 공격
+
+    def test_actor_policy_override_beats_monster_ai(self):
+        db, p, e, st = fresh("skeleton_warrior")
+        st["policies"][e["id"]] = "random"
+        e["hp"] = 30.0
+        picks = {combat.choose_skill(st, e) for _ in range(60)}
+        self.assertEqual(picks, {"slash", "guard"})
 
 
 class HumanoidTests(unittest.TestCase):

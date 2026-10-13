@@ -81,16 +81,28 @@ def policy_random(state, actor):
     return state["rng"].choice(options) if options else None
 
 
+def policy_guard_when_hurt(state, actor):
+    """평소엔 가장 센 공격, 생명력이 임계값 아래로 떨어지면 방어 스킬을 우선(방패병류)."""
+    threshold = state["db"]["rules"]["ai"]["guard_hp_threshold"]
+    if actor["hp"] < actor["max_hp"] * threshold:
+        for sid in usable_skills(state, actor):
+            if state["db"]["skills"][sid]["kind"] == "defend":
+                return sid
+    return policy_attack_only(state, actor)
+
+
 POLICIES = {
     "highest_value": policy_highest_value,
     "attack_only": policy_attack_only,
     "random": policy_random,
+    "guard_when_hurt": policy_guard_when_hurt,
 }
 DEFAULT_POLICY = "highest_value"
 
 
 def choose_skill(state, actor):
-    name = state["policies"].get(actor["id"], DEFAULT_POLICY)
+    """정책 우선순위: 전투 시작 때 지정한 정책 > 참가자 자신의 ai(몬스터 DB) > 기본 정책."""
+    name = state["policies"].get(actor["id"]) or actor.get("ai") or DEFAULT_POLICY
     return POLICIES[name](state, actor)
 
 
@@ -230,6 +242,8 @@ def resolve_attack(state, attacker, defender, skill_id):
     if not defender["alive"]:
         return
     for eff in skill.get("on_hit", []):
+        if rng.random() >= eff.get("chance", 1.0):
+            continue
         apply_status(state, defender, eff["status"], eff.get("stacks", 1), eff.get("duration", 1))
     _damage_part(state, defender)
 
@@ -237,7 +251,8 @@ def resolve_attack(state, attacker, defender, skill_id):
 def do_action(state, actor, skill_id):
     skill = state["db"]["skills"][skill_id]
     actor["spirit"] -= skill["cost"]
-    actor["cooldowns"][skill_id] = skill["cooldown"] + 1   # 라운드 종료 때 1 깎이므로 +1 → 실제로 N라운드 못 씀
+    # 쿨타임 N(>=1) = 사용 후 N라운드 동안 사용 불가(라운드 종료 때 1 깎이므로 +1). 0 이면 제한 없음(한 라운드에 여러 번 가능).
+    actor["cooldowns"][skill_id] = skill["cooldown"] + 1 if skill["cooldown"] > 0 else 0
     if skill["kind"] == "defend":
         amount = skill["shield_base"] + eff_stat(actor, "phys_res") * skill["shield_per_phys_res"]
         actor["shield"] += amount

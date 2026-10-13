@@ -18,6 +18,7 @@ python3 -m sim.simulate --race barbarian --weapon greatsword --enemy ghoul -n 20
 python3 -m sim.simulate --matrix races     # 종족 x 1층
 python3 -m sim.simulate --matrix weapons   # 성인식 무기 x 1층
 python3 -m sim.simulate --matrix floor2    # 무기 x 2층
+python3 -m sim.simulate --matrix bestiary  # 몬스터 18종 도감 (승률·라운드·남은 HP·즉사율)
 python3 -m sim.simulate --log --enemy goblin --seed 3   # 전투 로그 1판
 ```
 

@@ -26,7 +26,7 @@ def eff_stat(c, stat):
     return v
 
 
-def _new_combatant(db, cid, name, side, base_stats, skills, gear, ranged, grade, humanoid, is_player):
+def _new_combatant(db, cid, name, side, base_stats, skills, gear, ranged, grade, humanoid, is_player, ai=None):
     stats = dict(STAT_DEFAULTS)
     stats.update(base_stats)
     rules = db["rules"]
@@ -35,6 +35,7 @@ def _new_combatant(db, cid, name, side, base_stats, skills, gear, ranged, grade,
         "name": name,
         "side": side,
         "is_player": is_player,
+        "ai": ai,
         "base_stats": stats,
         "gear": gear,
         "skills": list(skills),
@@ -84,7 +85,7 @@ def make_player(db, race="barbarian", weapon="greatsword", armor=None, skills=No
     gear += [make_gear(db, a) for a in armor_ids]
     c = _new_combatant(
         db, race, name or race_def["name_ko"], "ally", race_def["stats"],
-        skills if skills is not None else list(db["skills"].keys()),
+        skills if skills is not None else list(db["player_default_skills"]),
         gear, ranged=(weapon == "bow"), grade=None, humanoid=True, is_player=True,
     )
     apply_mastery(db, c, vs_mastery)
@@ -118,6 +119,7 @@ def make_monster(db, monster_id):
         db, monster_id, m["name_ko"], "enemy", stats,
         m.get("skills", db["monster_defaults"]["skills"]),
         [], ranged=m["ranged"], grade=m["grade"], humanoid=False, is_player=False,
+        ai=m.get("ai", db["monster_defaults"]["ai"]),
     )
 
 
@@ -126,6 +128,7 @@ def make_npc(db, npc_id):
     return _new_combatant(
         db, npc_id, n["name_ko"], "enemy", n["stats"], n["skills"],
         [], ranged=n["ranged"], grade=None, humanoid=n["humanoid"], is_player=False,
+        ai=n.get("ai", db["monster_defaults"]["ai"]),
     )
 
 

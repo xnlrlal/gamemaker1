@@ -8,6 +8,7 @@ import os
 
 DEFAULT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "db.json")
 
+VALID_AI = ("highest_value", "attack_only", "random", "guard_when_hurt")
 RACE_REQUIRED_STATS = ("spirit", "body", "mind", "psychic", "strength", "phys_res", "regen", "smell")
 
 
@@ -39,6 +40,12 @@ def validate_db(db):
         for eff in s.get("on_hit", []):
             if eff["status"] not in db["rules"]["status"]:
                 raise DbError("skill %s: unknown status %r" % (sid, eff["status"]))
+            if not 0.0 < eff.get("chance", 1.0) <= 1.0:
+                raise DbError("skill %s: on_hit chance must be in (0, 1]" % sid)
+
+    for sid in db["player_default_skills"]:
+        if sid not in skills:
+            raise DbError("player_default_skills: unknown skill %s" % sid)
 
     for rid, r in db["races"].items():
         for st in RACE_REQUIRED_STATS:
@@ -57,9 +64,17 @@ def validate_db(db):
     for mid, m in db["monsters"].items():
         if not 1 <= m["grade"] <= 9:
             raise DbError("monster %s: grade must be 1..9" % mid)
+    if db["monster_defaults"]["ai"] not in VALID_AI:
+        raise DbError("monster_defaults: unknown ai %r" % db["monster_defaults"]["ai"])
     for sid in db["monster_defaults"]["skills"]:
         if sid not in skills:
             raise DbError("monster_defaults: unknown skill %s" % sid)
+    for mid, m in db["monsters"].items():
+        for sid in m.get("skills", []):
+            if sid not in skills:
+                raise DbError("monster %s: unknown skill %s" % (mid, sid))
+        if m.get("ai", "attack_only") not in VALID_AI:
+            raise DbError("monster %s: unknown ai %r" % (mid, m["ai"]))
     for nid, n in db["npcs"].items():
         for sid in n["skills"]:
             if sid not in skills:
