@@ -9,6 +9,7 @@
   python -m sim.simulate --log --enemy goblin    # 전투 로그 1판 출력
 """
 import argparse
+import json
 
 from .combat import new_combat, run_combat
 from .db import load_db
@@ -100,6 +101,7 @@ def main():
     ap.add_argument("--policy", default=None, help="highest_value / attack_only / random")
     ap.add_argument("--matrix", default=None, help="races / weapons / floor2 / bestiary")
     ap.add_argument("--log", action="store_true", help="전투 1판의 로그 출력")
+    ap.add_argument("--json", action="store_true", help="단일 조합 결과를 JSON 한 줄로 출력(웹 이식 검증용)")
     args = ap.parse_args()
     db = load_db(args.db)
 
@@ -116,6 +118,9 @@ def main():
         matrix(db, args.matrix, args.n, args.seed, args.mastery, args.policy)
         return
     r = simulate(db, args.race, args.weapon, args.enemy, args.n, args.seed, args.mastery, args.policy)
+    if args.json:
+        print(json.dumps(r))
+        return
     print("%s(%s) vs %s  n=%d" % (args.race, args.weapon, args.enemy, r["n"]))
     for k, v in r.items():
         if k != "n":

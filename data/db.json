@@ -4,6 +4,52 @@
     "note": "기획서 v6 기준. 'temp' 표시가 없어도 규칙 수치(rules.*)와 스킬 수치(skills.*)는 전부 임시값이며 시뮬레이션으로 조정한다. 종족·장비·몬스터 등급 공식은 기획서 원문 값."
   },
 
+  "status_names": { "poison": "독", "bleed": "출혈", "stun": "기절" },
+  "part_names": { "torso": "몸통", "left_arm": "왼팔", "right_arm": "오른팔", "left_leg": "왼다리", "right_leg": "오른다리" },
+  "stat_names": {
+    "strength": "근력", "phys_res": "물리내성", "regen": "자연재생", "accuracy": "명중률",
+    "flexibility": "유연성", "agility": "민첩성", "spirit": "영혼력", "body": "육체", "mind": "정신", "psychic": "이능", "smell": "후각"
+  },
+  "zone_names": { "north": "북", "east": "동", "south": "남", "west": "서", "center": "중심부" },
+
+  "dungeon": {
+    "note": "프로토타입용 임시 수치. 맵 생성은 world_seed 고정 — 모든 캐릭터에게 같은 지형(7-1).",
+    "world_seed": 20261012,
+    "seconds_per_day": 60,
+    "judgment_seconds": 15,
+    "judgment_interval_days": 7,
+    "move_tiles_per_second": 6,
+    "local_vision": 4,
+    "step_heal_pct": 0.01,
+    "auto_warn_win_rate": 0.6,
+    "floor1": {
+      "name": "수정동굴",
+      "forced_return_days": 3,
+      "width": 45,
+      "height": 45,
+      "fill": 0.47,
+      "smooth_passes": 5,
+      "min_open_tiles": 700,
+      "center_radius": 6,
+      "encounter_chance": 0.07,
+      "safe_start_steps": 3,
+      "group_days_per_extra": 0.8,
+      "group_max": 4
+    }
+  },
+
+  "economy": {
+    "exchange_rate_by_grade": { "9": 10, "8": 14, "7": 18, "6": 22, "5": 26, "4": 30, "3": 34, "2": 38, "1": 42 },
+    "maseok_drop_chance": 0.7,
+    "start_stones": 0
+  },
+
+  "progression": {
+    "exp_by_grade": { "9": 20, "8": 30, "7": 45, "6": 70, "5": 100, "4": 140, "3": 190, "2": 250, "1": 330 },
+    "portal_exp": 15,
+    "exp_to_level": [0, 40, 100, 180, 280, 400, 540]
+  },
+
   "rules": {
     "max_hp": 100,
     "spirit_scale": 10,
