@@ -175,7 +175,7 @@ function monsterTurn(G, ts, m) {
   if (!m.alert) return;
   m.shield = 0; // 방어막은 다음 자기 턴 시작까지 유지 [임시 규칙]
   if (m.stunned) { m.stunned = false; ts.log.push('T' + ts.round + ' ' + m.name + ' 기절로 행동 불가'); return; }
-  const n = DS.actionCount(m); // 민첩성이 높을수록 한 턴에 여러 번 행동(이동 포함)
+  const n = DS.actionCount(m); // 민첩성이 높을수록 한 턴에 여러 번 공격할 수 있다
   for (let i = 0; i < n && p.alive; i++) {
     const choice = monsterChoose(G, m, p);
     if (choice) { useSkill(G, ts, m, choice.sid, p); continue; }
@@ -183,8 +183,8 @@ function monsterTurn(G, ts, m) {
     const blocked = new Set(G.dungeon.monsters.filter((o) => o.alive && o !== m).map((o) => o.pos.y * floor.width + o.pos.x));
     blocked.add(p.pos.y * floor.width + p.pos.x);
     const path = DS.findPathAvoiding(floor, m.pos, p.pos, blocked);
-    if (path && path.length > 1) { m.pos = { x: path[0].x, y: path[0].y }; }
-    else break;
+    if (path && path.length > 1) m.pos = { x: path[0].x, y: path[0].y };
+    break; // 이동하면 그 턴은 끝난다(플레이어와 같은 규칙): 추가 행동은 공격에만 쓰이고, 물러서는 상대를 쫓아와 때리지 못한다
   }
 }
 

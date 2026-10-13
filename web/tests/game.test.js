@@ -346,3 +346,55 @@ test('사냥 숙련·첫 처치 경험치·포탈 발견은 한 번만', () => {
   assert.ok(DS.discoverPortal(G, 'north'));
   assert.strictEqual(DS.discoverPortal(G, 'north'), null);
 });
+
+// ------------------------------------------------------------ 후퇴
+/** 가로로 7칸 이상 열린 복도에서, 적이 바로 옆에 붙은 상태로 시작한다. */
+function corridorFight(id, seed) {
+  const G = inDungeon(seed);
+  const f = floor();
+  let s = null;
+  for (let y = 1; y < f.height - 1 && !s; y++) for (let x = 1; x < f.width - 7 && !s; x++) {
+    let ok = true; for (let i = 0; i < 7; i++) if (!DS.isOpen(f, x + i, y)) { ok = false; break; }
+    if (ok) s = { x, y };
+  }
+  const p = G.char.player;
+  p.pos = { x: s.x + 1, y: s.y }; G.dungeon.pos = { ...p.pos };
+  const m = place(G, id, s.x, s.y);
+  m.alert = true; m.alert_turns = 6;
+  return { G, m, p };
+}
+
+test('물러서는 동안에는 근접 몬스터에게 맞지 않는다(구울 포함)', () => {
+  for (const id of ['gnome', 'ghoul', 'blade_wolf']) {
+    for (let seed = 1; seed <= 40; seed++) {
+      const { G, p } = corridorFight(id, seed);
+      for (let i = 0; i < 5; i++) {
+        const hp0 = p.hp;
+        assert.ok(DS.playerMove(G, 1, 0).ok);
+        assert.ok(p.hp >= hp0 - 0.01, id + ' hit a retreating player (seed ' + seed + ', step ' + i + ')');
+      }
+    }
+  }
+});
+
+test('빠른 몬스터의 추가 행동은 붙어 있을 때 공격 횟수로 쓰인다', () => {
+  let doubled = false;
+  for (let seed = 1; seed <= 30 && !doubled; seed++) {
+    const { G, m, p } = corridorFight('ghoul', seed);
+    m.action_gauge = 1.0; // 이번 턴 추가 행동 확보
+    const before = G.dungeon.log.length;
+    DS.playerWait(G);
+    const attacks = G.dungeon.log.slice(before).filter((l) => l.includes(m.name) && l.includes('→')).length;
+    if (attacks >= 2) doubled = true;
+  }
+  assert.ok(doubled, 'ghoul attacked twice in one turn when adjacent');
+});
+
+test('한 칸 떨어진 적이 다가오는 턴에는 공격하지 못한다', () => {
+  const { G, m, p } = corridorFight('ghoul', 3);
+  m.pos = { x: p.pos.x - 2, y: p.pos.y }; m.action_gauge = 1.0; // 추가 행동이 있어도
+  const hp0 = p.hp;
+  DS.playerWait(G);
+  assert.strictEqual(DS.manhattan(m.pos, p.pos), 1);
+  assert.ok(p.hp >= hp0 - 0.01, 'moving ends the turn');
+});
