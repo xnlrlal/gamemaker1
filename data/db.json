@@ -1,0 +1,132 @@
+{
+  "meta": {
+    "schema": 1,
+    "note": "기획서 v6 기준. 'temp' 표시가 없어도 규칙 수치(rules.*)와 스킬 수치(skills.*)는 전부 임시값이며 시뮬레이션으로 조정한다. 종족·장비·몬스터 등급 공식은 기획서 원문 값."
+  },
+
+  "rules": {
+    "max_hp": 100,
+    "spirit_scale": 10,
+    "spirit_regen_base": 2.0,
+    "spirit_regen_per_point": 1.0,
+    "max_rounds": 200,
+
+    "actions": { "base": 1, "cap": 3, "extra_per_agility": 0.2 },
+
+    "hit": { "base": 0.90, "per_accuracy": 0.02, "per_flexibility": 0.01, "per_stealth": 0.01, "min": 0.50, "max": 0.97 },
+    "crit": { "base": 0.05, "per_flexibility": 0.01, "max": 0.50, "mult_base": 1.5, "mult_per_obsession": 0.05, "mult_max": 2.5 },
+    "damage": { "per_strength": 0.10, "min_damage": 1 },
+    "mitigation": { "per_phys_res": 0.02, "cap": 0.60 },
+
+    "regen": { "pct_of_max_hp_per_point": 0.005, "bleed_heal_factor": 0.5 },
+
+    "instakill": { "per_grade_step": 0.002, "ranged_bonus": 0.01, "cap": 0.05, "base_grade": 9 },
+
+    "part_damage": {
+      "chance": 0.15,
+      "parts": ["torso", "left_arm", "right_arm", "left_leg", "right_leg"],
+      "effects": {
+        "torso": { "stat": "regen", "delta": -3 },
+        "left_arm": { "stat": "accuracy", "delta": -3 },
+        "right_arm": { "stat": "accuracy", "delta": -3 },
+        "left_leg": { "stat": "flexibility", "delta": -3 },
+        "right_leg": { "stat": "flexibility", "delta": -3 }
+      },
+      "gear_slot": { "torso": "top", "left_leg": "shoes", "right_leg": "shoes" },
+      "durability_loss": 2
+    },
+
+    "status": {
+      "poison": { "damage_per_stack": 2.0, "stack_cap": 5, "resist_stat": "poison_res", "resist_per_point": 0.05, "min_factor": 0.2 },
+      "bleed": { "damage_per_stack": 2.0, "stack_cap": 5 },
+      "stun": { "resist_stat": "endurance", "resist_per_point": 0.05, "max_resist": 0.75 }
+    },
+
+    "monster_grade": {
+      "base_grade": 9,
+      "strength_per_step": 1,
+      "phys_res_per_step": 2,
+      "regen_from_grade": 5,
+      "regen_per_step": 2
+    },
+
+    "mastery": {
+      "kills_per_level": 12,
+      "max_level": 2,
+      "bonus_per_level": { "accuracy": 1, "flexibility": 1, "phys_res": 1 }
+    }
+  },
+
+  "skills": {
+    "slash":  { "name_ko": "베기", "kind": "attack", "power": 10, "cost": 3,  "cooldown": 0 },
+    "smash":  { "name_ko": "강타", "kind": "attack", "power": 25, "cost": 10, "cooldown": 3 },
+    "guard":  { "name_ko": "방어", "kind": "defend", "shield_base": 8, "shield_per_phys_res": 2.0, "cost": 3, "cooldown": 2 },
+    "pierce": { "name_ko": "관통", "kind": "attack", "power": 15, "cost": 6,  "cooldown": 1,
+                "on_hit": [ { "status": "bleed", "stacks": 1, "duration": 3 } ] }
+  },
+
+  "races": {
+    "barbarian": { "name_ko": "바바리안", "stats": { "spirit": 2, "body": 25, "mind": 35, "psychic": 1, "strength": 3, "phys_res": 0, "regen": 2, "smell": 0 } },
+    "human":     { "name_ko": "인간",     "stats": { "spirit": 3, "body": 20, "mind": 20, "psychic": 20, "strength": 0, "phys_res": 0, "regen": 2, "smell": 0 } },
+    "elf":       { "name_ko": "요정",     "stats": { "spirit": 4, "body": 8,  "mind": 28, "psychic": 24, "strength": 1, "phys_res": 0, "regen": 0, "smell": 0 } },
+    "dwarf":     { "name_ko": "드워프",   "stats": { "spirit": 3, "body": 24, "mind": 26, "psychic": 4,  "strength": 0, "phys_res": 4, "regen": 0, "smell": 0 } },
+    "beastman":  { "name_ko": "수인",     "stats": { "spirit": 2, "body": 28, "mind": 10, "psychic": 22, "strength": 2, "phys_res": 0, "regen": 2, "smell": 3 } }
+  },
+
+  "equipment": {
+    "weapons": {
+      "spear":      { "name_ko": "창",     "slot": "weapon", "bonuses": { "strength": 2 } },
+      "sword":      { "name_ko": "검",     "slot": "weapon", "bonuses": { "strength": 1, "phys_res": 1 } },
+      "mace":       { "name_ko": "둔기",   "slot": "weapon", "bonuses": { "strength": 2, "phys_res": 1 } },
+      "shield":     { "name_ko": "방패",   "slot": "weapon", "bonuses": { "phys_res": 2 } },
+      "greatsword": { "name_ko": "대검",   "slot": "weapon", "bonuses": { "strength": 3 } },
+      "bow":        { "name_ko": "활",     "slot": "weapon", "bonuses": { "accuracy": 3 } }
+    },
+    "armor": {
+      "cloth_top":    { "name_ko": "천 상의", "slot": "top",    "bonuses": { "phys_res": 1 }, "durability": 15 },
+      "cloth_bottom": { "name_ko": "천 하의", "slot": "bottom", "bonuses": { "phys_res": 2 }, "durability": null },
+      "sandals":      { "name_ko": "샌들",    "slot": "shoes",  "bonuses": { "regen": 2 },    "durability": 6 }
+    },
+    "barbarian_starter_armor": ["cloth_top", "cloth_bottom", "sandals"]
+  },
+
+  "monsters": {
+    "gnome":            { "name_ko": "노움",         "grade": 9, "floor": 1, "zone": "north", "ranged": false },
+    "blade_wolf":       { "name_ko": "칼날늑대",     "grade": 9, "floor": 1, "zone": "east",  "ranged": false },
+    "goblin":           { "name_ko": "고블린",       "grade": 9, "floor": 1, "zone": "south", "ranged": false },
+    "ghoul":            { "name_ko": "구울",         "grade": 9, "floor": 1, "zone": "west",  "ranged": false, "stat_override": { "strength": 1, "agility": 3 } },
+
+    "goblin_swordsman": { "name_ko": "고블린 검사",   "grade": 9, "floor": 2, "zone": "north", "ranged": false, "stat_override": { "strength": 1 } },
+    "goblin_archer":    { "name_ko": "고블린 궁수",   "grade": 9, "floor": 2, "zone": "north", "ranged": true,  "stat_override": { "strength": 1 } },
+
+    "elder_ghoul":      { "name_ko": "엘더구울",       "grade": 7, "floor": 2, "zone": "west",  "ranged": false },
+    "skeleton_warrior": { "name_ko": "스켈레톤 전사",  "grade": 8, "floor": 2, "zone": "west",  "ranged": false },
+    "skeleton_archer":  { "name_ko": "스켈레톤 궁수",  "grade": 8, "floor": 2, "zone": "west",  "ranged": true },
+    "skeleton_mage":    { "name_ko": "스켈레톤 마법사","grade": 7, "floor": 2, "zone": "west",  "ranged": false },
+    "banshee":          { "name_ko": "벤시",           "grade": 8, "floor": 2, "zone": "west",  "ranged": false },
+    "deathfiend":       { "name_ko": "데스핀드",       "grade": 6, "floor": 2, "zone": "west",  "ranged": false },
+
+    "corrupted_gnome":  { "name_ko": "타락한 노움",    "grade": 8, "floor": 2, "zone": "south", "ranged": false },
+    "kobold_shield":    { "name_ko": "코볼트 방패병",  "grade": 8, "floor": 2, "zone": "south", "ranged": false },
+    "stone_golem":      { "name_ko": "스톤골렘",       "grade": 7, "floor": 2, "zone": "south", "ranged": false },
+
+    "wolf":             { "name_ko": "늑대",           "grade": 8, "floor": 2, "zone": "east",  "ranged": false },
+    "bear":             { "name_ko": "곰",             "grade": 7, "floor": 2, "zone": "east",  "ranged": false },
+    "tiger":            { "name_ko": "호랑이",         "grade": 6, "floor": 2, "zone": "east",  "ranged": false }
+  },
+
+  "monster_defaults": {
+    "stats": { "spirit": 2 },
+    "skills": ["slash"]
+  },
+
+  "npcs": {
+    "wanderer": {
+      "name_ko": "떠돌이 탐험가",
+      "humanoid": true,
+      "ranged": false,
+      "stats": { "spirit": 3, "strength": 2, "phys_res": 3, "accuracy": 4, "flexibility": 3 },
+      "skills": ["slash"]
+    }
+  }
+}
