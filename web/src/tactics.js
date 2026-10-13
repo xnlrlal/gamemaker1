@@ -59,41 +59,66 @@ DS.findPathAvoiding = function (floor, from, to, blocked) {
 };
 
 // ------------------------------------------------------------ 몬스터 배치(고정 세계)
-/** 구역마다 몬스터 무리(진영)를 고정 시드로 배치한다. 같은 세계는 항상 같은 자리에 같은 무리가 있다(7-1). */
-DS.spawnMonsters = function (floor) {
+/** 몬스터 진영 자리: 구역마다 고정 시드로 정한다(같은 세계는 항상 같은 자리). 간격을 넓게 둬서 한꺼번에 몰리지 않게 한다. */
+DS.spawnCamps = function (floor) {
   const cfg = DS.db.dungeon.floor1;
   const rng = DS.newRng(DS.db.dungeon.world_seed + 999);
   const open = [];
   floor.grid.forEach((row, y) => row.forEach((v, x) => { if (v === 0) open.push({ x, y }); }));
   const camps = [];
-  const monsters = [];
-  let uid = 0;
-  const zones = ['north', 'east', 'south', 'west', 'center'];
-  for (const zone of zones) {
+  for (const zone of ['north', 'east', 'south', 'west', 'center']) {
     const want = zone === 'center' ? cfg.camps_center : cfg.camps_per_zone;
     const minDist = zone === 'center' ? cfg.spawn_min_dist_center : cfg.spawn_min_dist;
     const pool = open.filter((t) => DS.zoneAt(floor, t.x, t.y) === zone && Math.hypot(t.x - floor.start.x, t.y - floor.start.y) >= minDist);
-    for (let n = 0, tries = 0; n < want && tries < 400 && pool.length; tries++) {
+    for (let n = 0, tries = 0; n < want && tries < 800 && pool.length; tries++) {
       const t = DS.choice(rng, pool);
       if (camps.some((c) => Math.hypot(c.x - t.x, c.y - t.y) < cfg.camp_spacing)) continue;
-      camps.push(t); n++;
-      const size = cfg.group_min + DS.randInt(rng, cfg.group_max - cfg.group_min + 1);
-      const ids = DS.monstersInZone(zone);
-      const taken = new Set();
-      for (let k = 0; k < size; k++) {
-        const near = open.filter((o) => Math.hypot(o.x - t.x, o.y - t.y) <= 2 && !taken.has(o.y * floor.width + o.x)
-          && DS.zoneAt(floor, o.x, o.y) === zone && Math.hypot(o.x - floor.start.x, o.y - floor.start.y) >= minDist);
-        const spot = near.length ? DS.choice(rng, near) : t;
-        taken.add(spot.y * floor.width + spot.x);
-        const m = DS.makeMonster(DS.choice(rng, ids));
-        m.uid = 'm' + (uid++);
-        m.pos = { x: spot.x, y: spot.y };
-        m.alert = false; m.alert_turns = 0;
-        monsters.push(m);
-      }
+      camps.push({ id: camps.length, x: t.x, y: t.y, zone, state: 'dormant', min_dist: minDist });
+      n++;
     }
   }
-  return monsters;
+  return camps;
+};
+
+/** 미궁 n일째에 새로 만나는 무리의 크기(기획서 7-1: 첫날 단독 → 점차 늘어남). */
+DS.groupSizeForDay = function (day) {
+  const arr = DS.db.dungeon.floor1.group_by_day;
+  return arr[Math.min(Math.max(1, day), arr.length) - 1];
+};
+
+DS.dungeonDay = function (G) { return Math.floor(DS.dungeonDays(G)) + 1; };
+
+/** 플레이어가 진영에 가까이 가면(시야 밖에서) 그날의 크기만큼 몬스터가 나타난다. 한 번 나타난 진영은 다시 나오지 않는다. */
+DS.activateCamps = function (G) {
+  const d = G.dungeon, floor = DS.getFloor(), cfg = DS.db.dungeon.floor1, p = G.char.player;
+  let spawned = 0;
+  for (const camp of d.camps) {
+    if (camp.state !== 'dormant' || Math.hypot(camp.x - p.pos.x, camp.y - p.pos.y) > cfg.activate_radius) continue;
+    camp.state = 'active';
+    const size = DS.groupSizeForDay(DS.dungeonDay(G));
+    const rng = DS.newRng(DS.db.dungeon.world_seed + 7919 * (camp.id + 1) + size); // 같은 진영·같은 크기면 항상 같은 무리
+    const ids = DS.monstersInZone(camp.zone);
+    const occupied = new Set(d.monsters.filter((m) => m.alive).map((m) => m.pos.y * floor.width + m.pos.x));
+    occupied.add(p.pos.y * floor.width + p.pos.x);
+    for (let k = 0; k < size; k++) {
+      const near = [];
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+        const x = camp.x + dx, y = camp.y + dy;
+        if (DS.isOpen(floor, x, y) && Math.hypot(dx, dy) <= 2 && !occupied.has(y * floor.width + x)
+          && DS.zoneAt(floor, x, y) === camp.zone && Math.hypot(x - floor.start.x, y - floor.start.y) >= camp.min_dist) near.push({ x, y });
+      }
+      if (!near.length) break;
+      const spot = DS.choice(rng, near);
+      occupied.add(spot.y * floor.width + spot.x);
+      const m = DS.makeMonster(DS.choice(rng, ids));
+      m.uid = 'c' + camp.id + '_' + k;
+      m.camp = camp.id;
+      m.pos = spot; m.alert = false; m.alert_turns = 0;
+      d.monsters.push(m);
+      spawned++;
+    }
+  }
+  return spawned;
 };
 
 DS.monsterAt = function (G, x, y) {
@@ -227,6 +252,7 @@ function reapKills(G) {
 DS.worldTick = function (G) {
   const d = G.dungeon, ts = tstate(G), p = G.char.player;
   reapKills(G);
+  DS.activateCamps(G);
   const order = d.monsters.filter((m) => m.alive).sort((a, b) => DS.manhattan(a.pos, p.pos) - DS.manhattan(b.pos, p.pos));
   for (const m of order) {
     if (!p.alive) break;

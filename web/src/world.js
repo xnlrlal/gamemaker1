@@ -110,28 +110,9 @@ DS.findPath = function (floor, from, to) {
 };
 
 // ------------------------------------------------------------ 조우
-DS.groupSize = function (elapsedDays) {
-  const cfg = DS.db.dungeon.floor1;
-  return Math.min(cfg.group_max, 1 + Math.floor(elapsedDays / cfg.group_days_per_extra));
-};
-
 DS.monstersInZone = function (zone) {
   const all = Object.entries(DS.db.monsters).filter(([, m]) => m.floor === 1);
   return all.filter(([, m]) => zone === 'center' || m.zone === zone).map(([id]) => id);
-};
-
-/** 걸음마다 호출. 조우가 나면 {enemies:[id...]} 아니면 null. */
-DS.rollEncounter = function (G, floor, x, y) {
-  const d = G.dungeon;
-  if (d.steps <= DS.db.dungeon.floor1.safe_start_steps) return null;
-  if (DS.rand(G.rng) >= DS.db.dungeon.floor1.encounter_chance) return null;
-  const zone = DS.zoneAt(floor, x, y);
-  const pool = DS.monstersInZone(zone);
-  const days = d.elapsed_ms / 1000 / DS.db.dungeon.seconds_per_day;
-  const n = DS.groupSize(days);
-  const enemies = [];
-  for (let i = 0; i < n; i++) enemies.push(DS.choice(G.rng, pool));
-  return { enemies, zone };
 };
 
 // ------------------------------------------------------------ 보상

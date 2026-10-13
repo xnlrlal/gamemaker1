@@ -15,6 +15,7 @@ function inDungeon(seed = 1, weapon = 'greatsword') {
   const G = newChar(seed, weapon);
   DS.enterDungeon(G);
   G.dungeon.monsters = []; // 테스트에서는 직접 배치한다
+  G.dungeon.camps.forEach((c) => { c.state = 'active'; }); // 진영이 저절로 나타나지 않게 막는다
   return G;
 }
 function place(G, id, x, y) {
@@ -63,21 +64,78 @@ test('구역별 몬스터는 기획서 6-2 와 일치, 중심부는 4구역 혼�
   assert.strictEqual(DS.monstersInZone('center').length, 4);
 });
 
-test('몬스터 배치: 고정 시드라 항상 같고, 구역·간격·무리 크기 규칙을 지킨다', () => {
+test('진영 자리: 고정 시드, 구역·간격 규칙을 지키고 서로 멀리 떨어져 있다', () => {
   const f = floor(), cfg = DS.db.dungeon.floor1;
-  const a = DS.spawnMonsters(f), b = DS.spawnMonsters(f);
-  assert.deepStrictEqual(a.map((m) => [m.id, m.pos]), b.map((m) => [m.id, m.pos]));
-  assert.ok(a.length >= 10, 'enough monsters: ' + a.length);
-  const seen = new Set();
-  for (const m of a) {
-    assert.ok(DS.isOpen(f, m.pos.x, m.pos.y));
-    assert.ok(Math.hypot(m.pos.x - f.start.x, m.pos.y - f.start.y) >= cfg.spawn_min_dist_center - 0.01);
-    const zone = DS.zoneAt(f, m.pos.x, m.pos.y);
-    if (zone !== 'center') assert.ok(DS.monstersInZone(zone).includes(m.id), m.id + ' in ' + zone);
-    const k = m.pos.y * f.width + m.pos.x;
-    assert.ok(!seen.has(k), 'no stacking');
-    seen.add(k);
+  const a = DS.spawnCamps(f), b = DS.spawnCamps(f);
+  assert.deepStrictEqual(a, b);
+  assert.ok(a.length >= 10, 'enough camps: ' + a.length);
+  for (const c of a) {
+    assert.ok(DS.isOpen(f, c.x, c.y));
+    assert.strictEqual(DS.zoneAt(f, c.x, c.y), c.zone);
+    assert.ok(Math.hypot(c.x - f.start.x, c.y - f.start.y) >= (c.zone === 'center' ? cfg.spawn_min_dist_center : cfg.spawn_min_dist) - 0.01);
+    for (const o of a) if (o !== c) assert.ok(Math.hypot(o.x - c.x, o.y - c.y) >= cfg.camp_spacing - 0.01, 'camps spaced out');
   }
+});
+
+test('무리 크기는 그날에 따라 1·2·3마리이고 3일 이후에도 상한을 넘지 않는다', () => {
+  assert.deepStrictEqual([1, 2, 3, 4, 9].map(DS.groupSizeForDay), [1, 2, 3, 3, 3]);
+});
+
+function nearestCamp(G) {
+  const f = floor();
+  return G.dungeon.camps.slice().sort((a, b) => Math.hypot(a.x - f.start.x, a.y - f.start.y) - Math.hypot(b.x - f.start.x, b.y - f.start.y))[0];
+}
+/** 진영 바로 옆(2칸 이내 열린 칸)으로 플레이어를 옮기고 한 턴 보낸다. */
+function approachCamp(G, camp) {
+  const f = floor();
+  let spot = null;
+  for (let r = 3; r <= 5 && !spot; r++) for (let dy = -r; dy <= r && !spot; dy++) for (let dx = -r; dx <= r; dx++) {
+    if (Math.hypot(dx, dy) >= 3 && DS.isOpen(f, camp.x + dx, camp.y + dy)) { spot = { x: camp.x + dx, y: camp.y + dy }; break; }
+  }
+  const p = G.char.player;
+  p.pos = spot; G.dungeon.pos = { ...spot };
+  DS.playerWait(G);
+}
+
+test('첫날에는 진영마다 한 마리씩 나타난다 (모든 진영을 지나가도 한꺼번에 몰리지 않는다)', () => {
+  const G = newChar(2); DS.enterDungeon(G);
+  assert.strictEqual(G.dungeon.monsters.length, 0, 'nothing spawned until you get close');
+  for (const camp of G.dungeon.camps) approachCamp(G, camp);
+  const byCamp = {};
+  for (const m of G.dungeon.monsters) byCamp[m.camp] = (byCamp[m.camp] || 0) + 1;
+  for (const c of G.dungeon.camps) assert.strictEqual(byCamp[c.id], 1, 'camp ' + c.id + ' on day 1');
+});
+
+test('둘째 날부터 두 마리, 셋째 날부터 세 마리씩 나타난다', () => {
+  for (const [day, want] of [[2, 2], [3, 3]]) {
+    const G = newChar(2); DS.enterDungeon(G);
+    G.dungeon.elapsed_ms = (day - 1) * DS.db.dungeon.seconds_per_day * 1000 + 1000;
+    const camp = nearestCamp(G);
+    approachCamp(G, camp);
+    assert.strictEqual(G.dungeon.monsters.filter((m) => m.camp === camp.id).length, want, 'day ' + day);
+  }
+});
+
+test('한 번 나타난 진영은 다시 나타나지 않고, 시야 밖에서 나타난다', () => {
+  const G = newChar(2); DS.enterDungeon(G);
+  const camp = nearestCamp(G);
+  approachCamp(G, camp);
+  const n = G.dungeon.monsters.length;
+  G.dungeon.monsters = [];
+  DS.playerWait(G); DS.playerWait(G);
+  assert.strictEqual(G.dungeon.monsters.length, 0, 'camp is spent');
+  assert.ok(n >= 1);
+  // 처음 나타나는 순간 플레이어의 밝은 시야(local_vision) 밖이다
+  const G2 = newChar(2); DS.enterDungeon(G2);
+  const c2 = nearestCamp(G2), f = floor();
+  const p = G2.char.player;
+  let spot = null;
+  for (let r = DS.db.dungeon.floor1.activate_radius; r >= 7 && !spot; r--) for (let dy = -r; dy <= r && !spot; dy++) for (let dx = -r; dx <= r; dx++) {
+    if (Math.abs(Math.hypot(dx, dy) - r) < 0.5 && DS.isOpen(f, c2.x + dx, c2.y + dy)) { spot = { x: c2.x + dx, y: c2.y + dy }; break; }
+  }
+  p.pos = spot; G2.dungeon.pos = { ...spot };
+  DS.activateCamps(G2);
+  for (const m of G2.dungeon.monsters) assert.ok(Math.hypot(m.pos.x - spot.x, m.pos.y - spot.y) > DS.db.dungeon.local_vision - 0.01, 'spawns outside the lit area');
 });
 
 // ------------------------------------------------------------ 시선·사거리
@@ -324,7 +382,8 @@ test('캐릭터 생성 → 마을 → 판단창 → 입장, 거부는 불이익 
   DS.townSkip(G);
   DS.enterDungeon(G);
   assert.strictEqual(G.screen, 'dungeon');
-  assert.ok(G.dungeon.monsters.length >= 10);
+  assert.ok(G.dungeon.camps.length >= 10);
+  assert.strictEqual(G.dungeon.monsters.length, 0);
 });
 
 test('환전소는 첫 귀환 뒤에만 열린다', () => {

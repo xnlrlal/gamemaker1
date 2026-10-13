@@ -43,7 +43,7 @@ const TILE = 36; // 지도 타일 한 칸의 CSS 픽셀 크기(ui.js tileSize �
   await page.click('.win-x');
 
   // 적을 모두 치워 두고(이 구간은 이동 테스트만) D패드를 꾹 누른다: 글자 선택 없음 + 계속 걷기 + 한 칸 = 한 턴
-  await G(() => { window.__G.dungeon.monsters = []; DS.uiRender(); });
+  await G(() => { const g = window.__G; g.dungeon.monsters = []; g.dungeon.camps.forEach((c) => { c.state = 'active'; }); DS.uiRender(); });
   const noSelect = await G(() => getComputedStyle(document.querySelector('.dpad .right')).userSelect === 'none' && getComputedStyle(document.getElementById('map')).userSelect === 'none');
   assert.ok(noSelect, 'user-select none on map controls');
   const turn0 = await G(() => window.__G.dungeon.turn);

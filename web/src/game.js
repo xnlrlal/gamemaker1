@@ -62,7 +62,7 @@ DS.enterDungeon = function (G) {
   p.pos = { x: floor.start.x, y: floor.start.y };
   G.dungeon = {
     elapsed_ms: 0, pos: { x: floor.start.x, y: floor.start.y }, steps: 0, turn: 0,
-    visited: [key(floor.start.x, floor.start.y)], monsters: DS.spawnMonsters(floor), log: [],
+    visited: [key(floor.start.x, floor.start.y)], monsters: [], camps: DS.spawnCamps(floor), log: [], day: 1,
   };
   healFully(p);
   G.screen = 'dungeon';
@@ -88,6 +88,11 @@ DS.dungeonDays = function (G) {
 DS.tickClock = function (G, dtMs) {
   if (!G.dungeon || G.screen !== 'dungeon') return false;
   G.dungeon.elapsed_ms += dtMs;
+  const day = DS.dungeonDay(G);
+  if (day > G.dungeon.day) {
+    G.dungeon.day = day;
+    G.msgs.push('미궁 ' + day + '일째입니다. 지금부터 새로 마주치는 몬스터는 ' + DS.groupSizeForDay(day) + '마리씩 무리를 짓습니다.');
+  }
   if (DS.dungeonDays(G) >= DS.db.dungeon.floor1.forced_return_days) {
     DS.forcedReturn(G);
     return true;

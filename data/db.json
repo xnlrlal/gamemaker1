@@ -31,19 +31,15 @@
       "smooth_passes": 5,
       "min_open_tiles": 700,
       "center_radius": 6,
-      "encounter_chance": 0.07,
       "camps_per_zone": 3,
       "camps_center": 2,
-      "group_min": 1,
-      "group_max": 3,
-      "camp_spacing": 6,
+      "camp_spacing": 11,
       "spawn_min_dist": 9,
       "spawn_min_dist_center": 5,
+      "activate_radius": 9,
+      "group_by_day": [1, 2, 3],
       "sight_radius": 6,
-      "lose_sight_turns": 6,
-      "safe_start_steps": 3,
-      "group_days_per_extra": 0.8,
-      "group_max": 4
+      "lose_sight_turns": 6
     }
   },
 
