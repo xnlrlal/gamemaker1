@@ -45,6 +45,7 @@ DS.makeGear = function (itemId) {
     bonuses: Object.assign({}, item.bonuses),
     durability: item.durability === undefined ? null : item.durability,
     max_durability: item.durability === undefined ? null : item.durability,
+    range: item.range || 0,
   };
 };
 

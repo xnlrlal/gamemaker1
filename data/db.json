@@ -19,7 +19,7 @@
     "judgment_seconds": 15,
     "judgment_interval_days": 7,
     "move_tiles_per_second": 6,
-    "local_vision": 4,
+    "local_vision": 6,
     "step_heal_pct": 0.01,
     "auto_warn_win_rate": 0.6,
     "floor1": {
@@ -32,6 +32,15 @@
       "min_open_tiles": 700,
       "center_radius": 6,
       "encounter_chance": 0.07,
+      "camps_per_zone": 3,
+      "camps_center": 2,
+      "group_min": 1,
+      "group_max": 3,
+      "camp_spacing": 6,
+      "spawn_min_dist": 9,
+      "spawn_min_dist_center": 5,
+      "sight_radius": 6,
+      "lose_sight_turns": 6,
       "safe_start_steps": 3,
       "group_days_per_extra": 0.8,
       "group_max": 4
@@ -117,12 +126,12 @@
     "bite":         { "name_ko": "물어뜯기",   "kind": "attack", "power": 10, "cost": 4, "cooldown": 1,
                       "on_hit": [ { "status": "bleed", "stacks": 1, "duration": 3 } ] },
     "rend":         { "name_ko": "찢기",       "kind": "attack", "power": 24, "cost": 5, "cooldown": 1 },
-    "shoot":        { "name_ko": "사격",       "kind": "attack", "power": 10, "cost": 3, "cooldown": 0 },
-    "aimed_shot":   { "name_ko": "조준 사격",  "kind": "attack", "power": 18, "cost": 8, "cooldown": 3 },
+    "shoot":        { "name_ko": "사격",       "kind": "attack", "power": 10, "cost": 3, "cooldown": 0, "range": 5 },
+    "aimed_shot":   { "name_ko": "조준 사격",  "kind": "attack", "power": 18, "cost": 8, "cooldown": 3, "range": 5 },
     "shield_bash":  { "name_ko": "방패 밀치기","kind": "attack", "power": 8,  "cost": 6, "cooldown": 3,
                       "on_hit": [ { "status": "stun", "chance": 0.3 } ] },
-    "spirit_bolt":  { "name_ko": "영혼탄",     "kind": "attack", "power": 14, "cost": 6, "cooldown": 1 },
-    "wail":         { "name_ko": "통곡",       "kind": "attack", "power": 6,  "cost": 5, "cooldown": 2,
+    "spirit_bolt":  { "name_ko": "영혼탄",     "kind": "attack", "power": 14, "cost": 6, "cooldown": 1, "range": 4 },
+    "wail":         { "name_ko": "통곡",       "kind": "attack", "power": 6,  "cost": 5, "cooldown": 2, "range": 3,
                       "on_hit": [ { "status": "stun", "chance": 0.25 } ] }
   },
 
@@ -136,12 +145,12 @@
 
   "equipment": {
     "weapons": {
-      "spear":      { "name_ko": "창", "desc": "긴 자루 끝에 날을 단 창. 거리를 두고 찌르기에 좋다.",     "slot": "weapon", "bonuses": { "strength": 2 } },
-      "sword":      { "name_ko": "검", "desc": "균형 잡힌 한 손 검. 막기도 베기도 무난하다.",     "slot": "weapon", "bonuses": { "strength": 1, "phys_res": 1 } },
-      "mace":       { "name_ko": "둔기", "desc": "묵직한 둔기. 뼈와 갑옷을 가리지 않고 두드린다.",   "slot": "weapon", "bonuses": { "strength": 2, "phys_res": 1 } },
-      "shield":     { "name_ko": "방패", "desc": "두꺼운 나무에 쇠를 덧댄 방패. 공격보다 버티기에 알맞다.",   "slot": "weapon", "bonuses": { "phys_res": 2 } },
-      "greatsword": { "name_ko": "대검", "desc": "원래 양손으로 휘두르는 대검. 바바리안은 한 손으로 든다.",   "slot": "weapon", "bonuses": { "strength": 3 } },
-      "bow":        { "name_ko": "활", "desc": "사냥용 활. 화살 소모는 아직 구현되지 않았다.",     "slot": "weapon", "bonuses": { "accuracy": 3 } }
+      "spear":      { "name_ko": "창", "desc": "긴 자루 끝에 날을 단 창. 거리를 두고 찌르기에 좋다.", "range": 2,     "slot": "weapon", "bonuses": { "strength": 2 } },
+      "sword":      { "name_ko": "검", "desc": "균형 잡힌 한 손 검. 막기도 베기도 무난하다.", "range": 1,     "slot": "weapon", "bonuses": { "strength": 1, "phys_res": 1 } },
+      "mace":       { "name_ko": "둔기", "desc": "묵직한 둔기. 뼈와 갑옷을 가리지 않고 두드린다.", "range": 1,   "slot": "weapon", "bonuses": { "strength": 2, "phys_res": 1 } },
+      "shield":     { "name_ko": "방패", "desc": "두꺼운 나무에 쇠를 덧댄 방패. 공격보다 버티기에 알맞다.", "range": 1,   "slot": "weapon", "bonuses": { "phys_res": 2 } },
+      "greatsword": { "name_ko": "대검", "desc": "원래 양손으로 휘두르는 대검. 바바리안은 한 손으로 든다.", "range": 1,   "slot": "weapon", "bonuses": { "strength": 3 } },
+      "bow":        { "name_ko": "활", "desc": "사냥용 활. 화살 소모는 아직 구현되지 않았다.", "range": 5,     "slot": "weapon", "bonuses": { "accuracy": 3 } }
     },
     "armor": {
       "cloth_top":    { "name_ko": "천 상의", "desc": "거칠게 짠 천 상의. 오래 입으면 해진다.", "slot": "top",    "bonuses": { "phys_res": 1 }, "durability": 15 },

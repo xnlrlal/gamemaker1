@@ -230,3 +230,7 @@ button.slot { cursor: pointer; }
 button, .slot, .win-x { touch-action: manipulation; -webkit-user-select: none; user-select: none; }
 .stage, .stage canvas, .dpad, .dpad button { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 canvas { -webkit-tap-highlight-color: transparent; }
+
+.hotbar .slot .info span { display: block; white-space: nowrap; }
+.hotbar .slot { min-height: 74px; }
+.hotbar .slot .info { font-size: 9.5px; line-height: 1.25; }

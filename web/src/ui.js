@@ -5,7 +5,7 @@
   let G = null;
   let toastsEl, screenEl, modalEl;
   const ui = { weapon: 'greatsword', confirmReset: false, mapMode: 'local', walk: [], held: null, stepT: 0,
-    prev: null, alpha: 1, predict: null, autoT: 0, saveT: 0, lastBattleLogLen: 0, log: [], modal: null, tip: null };
+    prev: null, alpha: 1, saveT: 0, log: [], modal: null, tip: null, armed: null, hpAtWalk: 0 };
 
   // ---------------------------------------------------------- 유틸
   function h(tag, attrs, ...kids) {
@@ -294,7 +294,7 @@
     ])];
   }
 
-  // ---------------------------------------------------------- 화면: 미궁
+  // ---------------------------------------------------------- 화면: 미궁 (지도 위 턴제 전투)
   function zoneLabel() {
     const floor = DS.getFloor();
     const z = DS.zoneAt(floor, G.dungeon.pos.x, G.dungeon.pos.y);
@@ -305,9 +305,35 @@
     const day = Math.min(max, Math.floor(d) + 1);
     return '미궁 ' + day + '일째 · 귀환까지 ' + Math.max(0, Math.ceil((max - d) * DS.db.dungeon.seconds_per_day)) + '초';
   }
+  const visibleMonsters = () => G.dungeon.monsters.filter((m) => m.alive && DS.canSee(G, m));
+  const turnText = () => '턴 ' + G.dungeon.turn + (DS.alertMonsters(G).length ? ' · 전투 중 (적 ' + DS.alertMonsters(G).length + ')' : '');
+
+  function statusIcons() {
+    const p = G.char.player;
+    return Object.entries(p.status).map(([sid, e]) => h('span', { title: DS.db.status_names[sid] || sid, style: 'color:var(--bad)' }, icon(sid === 'poison' ? 'drop' : 'drop'), e.stacks > 1 ? h('small', {}, e.stacks) : null));
+  }
+
+  function skillSlot(sid, i) {
+    const p = G.char.player, s = DS.db.skills[sid];
+    const cd = p.cooldowns[sid] || 0;
+    const noMp = cd === 0 && p.spirit < s.cost;
+    const val = s.kind === 'attack' ? '위력 ' + fmt(DS.skillValue(null, p, sid)) + ' · 사거리 ' + DS.skillRange(p, sid) : '방어막 ' + fmt(DS.skillValue(null, p, sid));
+    const extra = (s.on_hit || []).map((e) => DS.db.status_names[e.status] || e.status).join('·');
+    return h('button', { class: 'slot skill' + (ui.armed === sid ? ' on' : '') + (noMp ? ' nomp' : ''), disabled: cd > 0 || noMp, onclick: () => onSkill(sid),
+      'aria-label': s.name_ko + ', ' + val + ', 영혼력 ' + s.cost + ', 쿨타임 ' + s.cooldown + '턴' },
+      h('span', { class: 'key' }, (i + 1) % 10), h('span', { class: 'cost' }, s.cost),
+      icon(DS.skillIcon(sid)), h('span', { class: 'nm' }, s.name_ko),
+      h('span', { class: 'info' }, h('span', {}, s.kind === 'attack' ? '위력 ' + fmt(DS.skillValue(null, p, sid)) : '방어막 ' + fmt(DS.skillValue(null, p, sid))),
+        h('span', {}, (s.kind === 'attack' ? '거리 ' + DS.skillRange(p, sid) : '자신') + (extra ? ' · ' + extra : ''))),
+      h('span', { class: 'cd' }, cd > 0 ? cd : noMp ? '영혼력' : ''));
+  }
+  const waitSlot = () => h('button', { class: 'slot skill', onclick: () => act(() => DS.playerWait(G)), 'aria-label': '대기(한 턴 넘기기)' },
+    h('span', { class: 'key' }, '0'), icon('wait'), h('span', { class: 'nm' }, '대기'), h('span', { class: 'info' }, h('span', {}, '한 턴'), h('span', {}, '넘기기')));
+
+  function hotbarEl() { return h('div', { class: 'hotbar' }, G.char.player.skills.map(skillSlot), waitSlot()); }
 
   function screenDungeon() {
-    const canvas = h('canvas', { id: 'map', width: 480, height: 560, 'aria-label': '미궁 지도. 탭하면 그 칸으로 이동합니다.' });
+    const canvas = h('canvas', { id: 'map', width: 480, height: 560, 'aria-label': '미궁 지도. 탭하면 그 칸으로 이동합니다. 적을 탭하면 공격합니다.' });
     canvas.addEventListener('pointerdown', onMapTap);
     const dir = (name, label, glyph, dx, dy) => {
       const b = h('button', { class: name, 'aria-label': label }, glyph);
@@ -320,24 +346,71 @@
       for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(ev, () => { ui.held = null; });
       return b;
     };
-    const p = G.char.player;
     const stage = h('div', { class: 'stage' }, canvas,
-      h('div', { class: 'tracker' }, h('b', {}, '탐험'), h('span', { id: 'zone' }, zoneLabel()), h('br'), h('span', { id: 'clock', class: 'num' }, clockText())),
-      h('div', { class: 'stagelog' }, logLines(ui.log.slice(0, 4).reverse())),
+      h('div', { class: 'tracker' }, h('b', {}, '탐험'), h('span', { id: 'zone' }, zoneLabel()), h('br'), h('span', { id: 'clock', class: 'num' }, clockText()), h('br'), h('span', { id: 'turn', class: 'num' }, turnText())),
+      h('div', { class: 'statusicons', id: 'sticons' }, statusIcons()),
+      h('div', { class: 'stagelog', id: 'stagelog' }, logLines(G.dungeon.log.slice(-4))),
       h('div', { class: 'dpad' }, dir('up', '위', '▲', 0, -1), dir('left', '왼쪽', '◀', -1, 0), dir('down', '아래', '▼', 0, 1), dir('right', '오른쪽', '▶', 1, 0)));
-    return [stage, hudBottom()];
+    return [stage, h('div', { id: 'hudwrap', style: 'display:contents' }, hudBottom(hotbarEl()))];
   }
 
-  const tileSize = () => (ui.mapMode === 'local' ? 44 : 12);
+  /** 걸을 때마다 화면을 통째로 다시 그리지 않고(D패드 누름이 끊긴다) 바뀌는 부분만 갱신한다. */
+  function refreshDungeon() {
+    if (G.screen !== 'dungeon') return;
+    const hw = document.getElementById('hudwrap');
+    if (hw) hw.replaceChildren(hudBottom(hotbarEl()));
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('zone', zoneLabel()); set('turn', turnText());
+    const lg = document.getElementById('stagelog'); if (lg) lg.replaceChildren(...logLines(G.dungeon.log.slice(-4)));
+    const si = document.getElementById('sticons'); if (si) si.replaceChildren(...statusIcons());
+  }
+
+  const tileSize = () => (ui.mapMode === 'local' ? 36 : 12);
+
+  /** 한 번의 플레이어 행동(=한 턴)을 실행하고 화면을 갱신한다. */
+  function act(fn) {
+    if (G.screen !== 'dungeon') return null;
+    const hp0 = G.char.player.hp;
+    const r = fn();
+    if (r && !r.ok && r.reason && r.reason !== 'wall') G.msgs.push(r.reason);
+    if (r && r.ok) ui.armed = null;
+    flushMsgs();
+    save(G.screen !== 'dungeon');
+    if (G.screen !== 'dungeon') { ui.walk = []; ui.held = null; ui.armed = null; render(); return r; }
+    if (G.char.player.hp < hp0) ui.walk = []; // 맞으면 자동 이동을 멈춘다
+    refreshDungeon();
+    return r;
+  }
+
+  function onSkill(sid) {
+    if (G.screen !== 'dungeon') return;
+    const s = DS.db.skills[sid];
+    if (s.kind === 'defend') { act(() => DS.playerSkill(G, sid)); return; }
+    if (ui.armed === sid) { ui.armed = null; render(); return; }
+    const targets = visibleMonsters().filter((m) => DS.canUseSkill(G, sid, m).ok);
+    if (!targets.length) { G.msgs.push('사거리 안에 적이 없습니다.'); flushMsgs(); return; }
+    if (targets.length === 1) { act(() => DS.playerSkill(G, sid, targets[0].uid)); return; } // 대상이 하나면 바로 사용
+    ui.armed = sid; render(); // 여러 마리면 대상을 고른다
+  }
 
   function onMapTap(e) {
     if (G.screen !== 'dungeon') return;
     const r = e.currentTarget.getBoundingClientRect(), ts = tileSize(); // 타일 크기는 CSS 픽셀 기준
     const pos = G.dungeon.pos;
     const tx = Math.round(pos.x + (e.clientX - r.left - r.width / 2) / ts), ty = Math.round(pos.y + (e.clientY - r.top - r.height / 2) / ts);
+    const m = DS.monsterAt(G, tx, ty);
+    if (m && DS.canSee(G, m)) {
+      if (ui.armed) { act(() => DS.playerSkill(G, ui.armed, m.uid)); return; }
+      const chk = DS.canUseSkill(G, 'slash', m);
+      if (chk.ok || DS.manhattan(pos, m.pos) === 1) { act(() => DS.playerAttackDefault(G, m.uid)); return; }
+      // 멀리 있으면 가까이 다가간다(적이 경계 중이면 한 걸음씩)
+      const path = DS.findPath(DS.getFloor(), pos, m.pos);
+      if (path && path.length > 1) { ui.walk = path.slice(0, -1); ui.held = null; ui.hpAtWalk = G.char.player.hp; }
+      return;
+    }
     const path = DS.findPath(DS.getFloor(), pos, { x: tx, y: ty });
     // 지도에 보이는 칸만 목적지로 허용한다(가보지 않은 곳의 존재를 드러내지 않는다).
-    if (path && path.length && visible(tx, ty)) { ui.walk = path; ui.held = null; }
+    if (path && path.length && visible(tx, ty)) { ui.walk = path; ui.held = null; ui.hpAtWalk = G.char.player.hp; }
   }
 
   /** 지도에 보이는 칸. 로컬맵은 주변 반경 안, 전체맵은 가본 칸(과 그 벽)만. 안 가본 먼 칸은 흐린 표시조차 하지 않는다(7-1). */
@@ -354,6 +427,31 @@
 
   const hash = (x, y, k) => { let n = (x * 374761393 + y * 668265263 + k * 2147483647) | 0; n = (n ^ (n >>> 13)) * 1274126177; return ((n ^ (n >>> 16)) >>> 0) / 4294967296; };
 
+  const FAMILY = { gnome: ['person', '#7da05a'], goblin: ['person', '#6a9a4a'], ghoul: ['person', '#a9b38f'], blade_wolf: ['beast', '#8d8f98'], wolf: ['beast', '#85766a'] };
+
+  function drawFigure(ctx, kind, color, px, py, u) {
+    if (kind === 'beast') {
+      ctx.fillStyle = color; ctx.fillRect(px - u * 4, py - u * 1.5, u * 8, u * 3.2);
+      ctx.fillRect(px + u * 3, py - u * 3, u * 3, u * 2.6);
+      ctx.fillStyle = '#2a2a33'; ctx.fillRect(px - u * 3.5, py + u * 1.6, u * 1.4, u * 2); ctx.fillRect(px + u * 1.8, py + u * 1.6, u * 1.4, u * 2);
+      ctx.fillStyle = '#e8d070'; ctx.fillRect(px + u * 4.8, py - u * 2.4, u * 0.9, u * 0.9);
+      return;
+    }
+    ctx.fillStyle = color; ctx.fillRect(px - u * 2.2, py - u * 4, u * 4.4, u * 3);
+    ctx.fillStyle = '#4a3b33'; ctx.fillRect(px - u * 3, py - u, u * 6, u * 5);
+    ctx.fillStyle = '#2a2a33'; ctx.fillRect(px - u * 2.5, py + u * 4, u * 2, u * 2.4); ctx.fillRect(px + u * 0.5, py + u * 4, u * 2, u * 2.4);
+    ctx.fillStyle = '#9a9aa8'; ctx.fillRect(px - u * 4.2, py - u * 3, u * 1.1, u * 6);
+  }
+
+  function drawBracket(ctx, x, y, size, color, dpr) {
+    const l = size * 0.28;
+    ctx.strokeStyle = color; ctx.lineWidth = 2 * dpr;
+    for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      const cx = x + sx * size / 2, cy = y + sy * size / 2;
+      ctx.beginPath(); ctx.moveTo(cx, cy - sy * l); ctx.lineTo(cx, cy); ctx.lineTo(cx - sx * l, cy); ctx.stroke();
+    }
+  }
+
   function drawMap() {
     const cv = document.getElementById('map');
     if (!cv || !G.dungeon) return;
@@ -364,7 +462,7 @@
     if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
     const ctx = cv.getContext('2d'), floor = DS.getFloor();
     const local = ui.mapMode === 'local';
-    const ts = tileSize() * dpr * (local ? 1 : 1);
+    const ts = tileSize() * dpr;
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
     const pos = G.dungeon.pos, prev = ui.prev || pos;
     const cx = prev.x + (pos.x - prev.x) * ui.alpha, cy = prev.y + (pos.y - prev.y) * ui.alpha;
@@ -413,6 +511,27 @@
       gl.addColorStop(0, found ? 'rgba(110,210,130,0.95)' : 'rgba(120,170,255,0.95)'); gl.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(sx, sy, ts * 0.8, 0, Math.PI * 2); ctx.fill();
     }
+    // 몬스터: 시야(밝은 곳 + 시선)에 들어온 적만 보인다.
+    const u = Math.max(2.4, ts * 0.058);
+    const armedTargets = ui.armed ? new Set(visibleMonsters().filter((m) => DS.canUseSkill(G, ui.armed, m).ok).map((m) => m.uid)) : new Set();
+    if (local) {
+      for (const m of G.dungeon.monsters) {
+        if (!m.alive || !DS.canSee(G, m)) continue;
+        const sx = W / 2 + (m.pos.x - cx) * ts, sy = H / 2 + (m.pos.y - cy) * ts;
+        const fam = FAMILY[m.id] || ['person', '#b0696a'];
+        drawFigure(ctx, fam[0], fam[1], sx, sy, u);
+        const bw = ts * 0.78, by = sy - ts * 0.5;
+        if (m.hp < m.max_hp || m.alert) {
+          ctx.fillStyle = '#000b'; ctx.fillRect(sx - bw / 2, by, bw, 4 * dpr);
+          ctx.fillStyle = '#c4343d'; ctx.fillRect(sx - bw / 2, by, bw * Math.max(0, m.hp / m.max_hp), 4 * dpr);
+        }
+        if (m.alert) {
+          ctx.font = 'bold ' + 11 * dpr + 'px sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 3 * dpr;
+          ctx.strokeStyle = '#000'; ctx.strokeText('적!', sx, by - 3 * dpr); ctx.fillStyle = '#fff'; ctx.fillText('적!', sx, by - 3 * dpr);
+        }
+        if (armedTargets.has(m.uid)) drawBracket(ctx, sx, sy, ts * 0.96, '#ffd36a', dpr);
+      }
+    }
     // 횃불 빛과 어둠: 플레이어 주변만 밝고 바깥은 서서히 검게(스톤샤드식 시야).
     if (local) {
       const gx = W / 2, gy = H / 2, R = lightR * ts;
@@ -424,94 +543,12 @@
       ctx.fillStyle = warm; ctx.fillRect(0, 0, W, H);
     }
     // 현재 위치는 항상 화면 정중앙(7-1 지도 원칙)
-    const px = W / 2, py = H / 2, u = Math.max(3, ts * 0.075);
-    ctx.fillStyle = '#d8a25a'; ctx.fillRect(px - u * 2.2, py - u * 4, u * 4.4, u * 3);           // 머리
-    ctx.fillStyle = '#7a4a2a'; ctx.fillRect(px - u * 3, py - u, u * 6, u * 5);                    // 몸
-    ctx.fillStyle = '#3a3347'; ctx.fillRect(px - u * 2.5, py + u * 4, u * 2, u * 2.4); ctx.fillRect(px + u * 0.5, py + u * 4, u * 2, u * 2.4);
-    ctx.fillStyle = '#c9ced8'; ctx.fillRect(px + u * 3.2, py - u * 3, u * 1.1, u * 6);           // 무기
+    const pu = Math.max(2.4, ts * 0.058);
+    drawFigure(ctx, 'person', '#d8a25a', W / 2, H / 2, pu);
+    ctx.fillStyle = '#c9ced8'; ctx.fillRect(W / 2 + pu * 3.2, H / 2 - pu * 3, pu * 1.1, pu * 6);
   }
 
   function onMapDraw() { if (G.screen === 'dungeon') drawMap(); }
-
-  // ---------------------------------------------------------- 화면: 전투
-  function battleKey() { const g = G.dungeon.group; return g.enemies.join(',') + ':' + g.index + ':' + G.battle.rng.s; }
-
-  function statusChips(c) {
-    const chips = [];
-    for (const [sid, e] of Object.entries(c.status)) chips.push(h('span', { class: 'chip magic' }, (DS.db.status_names[sid] || sid) + ' ×' + e.stacks + ' · ' + e.duration + '턴'));
-    if (c.stunned) chips.push(h('span', { class: 'chip bad' }, '기절'));
-    for (const part of c.damaged_parts) chips.push(h('span', { class: 'chip warn' }, DS.db.part_names[part] + ' 손상'));
-    return chips;
-  }
-
-  const ENEMY_ICON = { gnome: 'person', blade_wolf: 'fang', goblin: 'person', ghoul: 'claw', goblin_swordsman: 'person', goblin_archer: 'bow',
-    elder_ghoul: 'claw', skeleton_warrior: 'skull', skeleton_archer: 'skull', skeleton_mage: 'skull', banshee: 'skull', deathfiend: 'skull',
-    corrupted_gnome: 'person', kobold_shield: 'shield', stone_golem: 'mace', wolf: 'fang', bear: 'claw', tiger: 'fang', wanderer: 'person' };
-
-  function skillSlot(sid, i) {
-    const st = G.battle, p = st.allies[0], s = DS.db.skills[sid];
-    const cd = p.cooldowns[sid] || 0;
-    const usable = DS.skillUsable(st, p, sid);
-    const val = s.kind === 'attack' ? '위력 ' + fmt(DS.skillValue(st, p, sid)) : '방어막 ' + fmt(DS.skillValue(st, p, sid));
-    const extra = (s.on_hit || []).map((e) => (DS.db.status_names[e.status] || e.status)).join('·');
-    const noMp = cd === 0 && p.spirit < s.cost;
-    return h('button', { class: 'slot skill' + (noMp ? ' nomp' : ''), disabled: !usable || G.auto, onclick: () => act(sid),
-      'aria-label': s.name_ko + ', ' + val + ', 영혼력 ' + s.cost + ', 쿨타임 ' + s.cooldown },
-      h('span', { class: 'key' }, (i + 1) % 10), h('span', { class: 'cost' }, s.cost),
-      icon(DS.skillIcon(sid)), h('span', { class: 'nm' }, s.name_ko), h('span', { class: 'info' }, val + (extra ? ' · ' + extra : '')),
-      h('span', { class: 'cd' }, cd > 0 ? cd : noMp ? '영혼력' : G.auto ? '자동' : ''));
-  }
-
-  function screenBattle() {
-    const st = G.battle, g = G.dungeon.group, p = st.allies[0], e = st.enemy;
-    const key = battleKey();
-    if (!ui.predict || ui.predict.key !== key) ui.predict = { key, p: DS.estimateWinRate(st, 200) };
-    const warn = ui.predict.p < DS.db.dungeon.auto_warn_win_rate;
-    const newFrom = Math.max(0, ui.lastBattleLogLen - Math.max(0, st.log.length - 10));
-    const lines = st.log.slice(-10);
-    const flashEnemy = st.last && st.last.kind === 'hit' && st.last.target === e.id;
-    const total = Math.max(1, g.enemies.length);
-    const flashPlayer = st.last && st.last.kind === 'hit' && st.last.target === p.id;
-    const enemyWin = win(e.name + (e.grade ? ' · ' + e.grade + '등급' : '') + (e.ranged ? ' · 원거리' : ''), [
-      h('div', { class: 'enemyart', html: DS.iconSvg(ENEMY_ICON[e.id] || 'skull') }),
-      bar('hp', e.hp, e.max_hp),
-      statusChips(e).length ? h('div', { class: 'chips' }, statusChips(e)) : null,
-    ], { arches: true, archCount: 9, cls: 'fighter' + (flashEnemy ? ' hit' : '') });
-    return [
-      h('div', { class: 'row' },
-        h('span', { class: 'chip' }, '무리 ' + (g.index + 1) + '/' + total),
-        h('span', { class: 'chip num' }, st.round === 0 ? '전투 시작' : st.round + '라운드'),
-        h('span', { class: 'grow' }),
-        h('span', { class: 'chip ' + (warn ? 'warn' : 'good') }, '예상 승률 ' + Math.round(ui.predict.p * 100) + '%')),
-      enemyWin,
-      warn ? h('p', { class: 'small', style: 'color:var(--warn)' }, '위험할 수 있습니다. 예상 승률이 낮습니다.') : null,
-      h('div', { class: 'battlelog log', id: 'blog' }, lines.length ? logLines(lines, newFrom) : h('div', { class: 'muted' }, '스킬을 골라 전투를 시작하세요.')),
-      h('div', { class: 'hud' + (flashPlayer ? ' fighter hit' : '') },
-        h('div', { class: 'bars' }, bar('hp', p.hp, p.max_hp), bar('mp', p.spirit, p.max_spirit)),
-        p.shield > 0 ? bar('sh thin', p.shield, 40) : null,
-        statusChips(p).length ? h('div', { class: 'chips' }, statusChips(p)) : null,
-        h('div', { class: 'hotbar' }, p.skills.map(skillSlot)),
-        h('label', { class: 'auto' },
-          h('input', { type: 'checkbox', class: 'switch', id: 'auto-sw', checked: G.auto, onchange: (ev) => { G.auto = ev.target.checked; render(); } }),
-          h('span', { class: 'grow' }, '자동 전투'),
-          h('span', { class: 'small muted' }, G.auto ? '끄면 수동으로 전환' : '켜 두면 다음 전투에도 이어짐'))),
-    ];
-  }
-
-  function act(sid) {
-    if (G.screen !== 'battle') return;
-    ui.lastBattleLogLen = G.battle.log.length;
-    afterAct(DS.battleAct(G, sid));
-  }
-
-  function afterAct(r) {
-    save(true);
-    if (r === 'defeat') G.auto = false;
-    if (r === 'next') ui.lastBattleLogLen = 0;
-    render();
-    const bl = document.getElementById('blog');
-    if (bl) bl.scrollTop = bl.scrollHeight;
-  }
 
   // ---------------------------------------------------------- 화면: 사망
   function screenDead() {
@@ -529,8 +566,8 @@
   // ---------------------------------------------------------- 렌더 루프
   function render() {
     flushMsgs();
-    const map = { create: screenCreate, town: screenTown, judgment: screenJudgment, dungeon: screenDungeon, battle: screenBattle, dead: screenDead };
-    const fill = G.screen === 'dungeon' || G.screen === 'battle';
+    const map = { create: screenCreate, town: screenTown, judgment: screenJudgment, dungeon: screenDungeon, dead: screenDead };
+    const fill = G.screen === 'dungeon';
     const scrollTop = screenEl.scrollTop;
     screenEl.className = 'screen' + (fill ? ' fill' : '');
     screenEl.replaceChildren(...map[G.screen]().filter(Boolean));
@@ -541,26 +578,28 @@
     DS.uiRender = render;
   }
 
+  /** 걷기: 한 칸 = 한 턴. 지도 탭 경로·D패드 누름 모두 한 걸음씩 playerMove 를 호출한다. */
   function stepWalk(dt) {
     if (G.screen !== 'dungeon') { ui.walk = []; return; }
     const speed = DS.db.dungeon.move_tiles_per_second;
     ui.stepT += dt;
     ui.alpha = Math.min(1, ui.alpha + dt * speed);
     if (ui.stepT < 1 / speed) return;
-    let target = null;
-    if (ui.walk.length) target = ui.walk[0];
-    else if (ui.held) target = { x: G.dungeon.pos.x + ui.held[0], y: G.dungeon.pos.y + ui.held[1] };
-    if (!target) { ui.stepT = 0; return; }
+    let dx = 0, dy = 0, fromPath = false;
+    const pos = G.dungeon.pos;
+    if (ui.walk.length) { dx = ui.walk[0].x - pos.x; dy = ui.walk[0].y - pos.y; fromPath = true; }
+    else if (ui.held) { dx = ui.held[0]; dy = ui.held[1]; }
+    else { ui.stepT = 0; return; }
     ui.stepT = 0;
-    const from = { x: G.dungeon.pos.x, y: G.dungeon.pos.y };
-    if (DS.stepTo(G, target.x, target.y)) {
-      ui.prev = from; ui.alpha = 0;
-      if (ui.walk.length) ui.walk.shift();
-      if (G.screen !== 'dungeon') { ui.walk = []; ui.held = null; ui.predict = null; ui.lastBattleLogLen = 0; render(); save(true); return; }
-      flushMsgs();
-      const z = document.getElementById('zone'); if (z) z.textContent = zoneLabel();
-      save(false);
-    } else ui.walk = [];
+    const from = { x: pos.x, y: pos.y };
+    const alertBefore = DS.alertMonsters(G).length;
+    const r = act(() => DS.playerMove(G, dx, dy));
+    if (!r || !r.ok) { ui.walk = []; return; }
+    if (G.screen !== 'dungeon') return;
+    if (r.moved) { ui.prev = from; ui.alpha = 0; }
+    if (fromPath) ui.walk.shift();
+    // 적이 새로 눈치채거나 경계 중이면 자동 이동을 멈춘다(한 걸음씩).
+    if (DS.alertMonsters(G).length > 0 && (alertBefore === 0 || fromPath)) ui.walk = [];
   }
 
   let last = performance.now(), clockAcc = 0;
@@ -573,9 +612,9 @@
         if (cd) cd.textContent = Math.max(0, Math.ceil(G.judgment.remaining_ms / 1000));
         if (G.judgment.remaining_ms <= 0) { DS.declineJudgment(G); save(true); render(); }
       }
-      // 미궁 시계(전투 중에도 흐른다)
-      if (G.dungeon && (G.screen === 'dungeon' || G.screen === 'battle')) {
-        if (DS.tickClock(G, dt * 1000)) { ui.walk = []; ui.held = null; G.auto = false; ui.modal = null; save(true); render(); }
+      // 미궁 시계는 현실 시간으로 흐른다(턴과 별개). 강제 귀환은 전투 중에도 일어난다.
+      if (G.dungeon && G.screen === 'dungeon') {
+        if (DS.tickClock(G, dt * 1000)) { ui.walk = []; ui.held = null; ui.armed = null; ui.modal = null; save(true); render(); }
         else {
           clockAcc += dt;
           if (clockAcc > 0.25) { clockAcc = 0; const c = document.getElementById('clock'); if (c) c.textContent = clockText(); }
@@ -583,20 +622,18 @@
       }
       stepWalk(dt);
       if (G.screen === 'dungeon') drawMap();
-      if (G.auto && G.screen === 'battle') {
-        ui.autoT += dt;
-        if (ui.autoT > 0.7) { ui.autoT = 0; ui.lastBattleLogLen = G.battle.log.length; afterAct(DS.battleAct(G, null)); }
-      }
     }
     requestAnimationFrame(frame);
   }
 
   function onKey(e) {
-    if (G.screen === 'battle' && /^[0-9]$/.test(e.key)) {
-      const i = (Number(e.key) + 9) % 10, sid = G.battle.allies[0].skills[i];
-      if (sid && !G.auto && DS.skillUsable(G.battle, G.battle.allies[0], sid)) act(sid);
+    if (G.screen === 'dungeon' && !ui.modal && /^[0-9]$/.test(e.key)) {
+      const sid = e.key === '0' ? null : G.char.player.skills[Number(e.key) - 1];
+      if (e.key === '0') act(() => DS.playerWait(G)); else if (sid) onSkill(sid);
       return;
     }
+    if (e.key === ' ' && G.screen === 'dungeon' && !ui.modal) { e.preventDefault(); act(() => DS.playerWait(G)); return; }
+    if (e.key === 'Escape' && ui.armed) { ui.armed = null; render(); return; }
     const m = { ArrowUp: [0, -1], w: [0, -1], ArrowDown: [0, 1], s: [0, 1], ArrowLeft: [-1, 0], a: [-1, 0], ArrowRight: [1, 0], d: [1, 0] }[e.key];
     if (!m || G.screen !== 'dungeon' || ui.modal) return;
     e.preventDefault();
@@ -615,7 +652,7 @@
     if (G.screen === 'judgment') G.judgment = G.judgment || { remaining_ms: DS.db.dungeon.judgment_seconds * 1000 };
     if (G.char) G.msgs.push('이어하기: 저장된 상태에서 계속합니다.');
     // 꾹 누르기 메뉴(복사·공유 등)가 조작 중에 뜨지 않게 막는다. 전투 로그·툴팁 글자는 선택할 수 있다.
-    app.addEventListener('contextmenu', (e) => { if (!e.target.closest('.battlelog, .tip')) e.preventDefault(); });
+    app.addEventListener('contextmenu', (e) => { if (!e.target.closest('.tip, .log')) e.preventDefault(); });
     window.addEventListener('keydown', onKey);
     window.addEventListener('keyup', () => { ui.held = null; });
     window.addEventListener('resize', onMapDraw);

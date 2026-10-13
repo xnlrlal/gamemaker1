@@ -32,6 +32,7 @@ const I = {
   lock: '<rect x="6" y="11" width="12" height="9" rx="1.500" class="f"/><path d="M8.500 11V8a3.500 3.500 0 0 1 7 0v3" stroke-width="1.800"/>',
   skull: '<path d="M12 3a7.500 7.500 0 0 0-5 13v3h3v-2h4v2h3v-3a7.500 7.500 0 0 0-5-13z" class="f"/><circle cx="9.200" cy="11" r="1.600" class="cut"/><circle cx="14.800" cy="11" r="1.600" class="cut"/>',
   drop: '<path d="M12 3c4 5 6 7.500 6 10.500a6 6 0 0 1-12 0C6 10.500 8 8 12 3z" class="f"/>',
+  wait: '<path d="M7 3h10M7 21h10M8 3c0 5 4 6 4 9s-4 4-4 9M16 3c0 5-4 6-4 9s4 4 4 9" stroke-width="1.8"/>',
   bolt: '<path d="m13 2-8 12h6l-1 8 8-12h-6z" class="f"/>',
   claw: '<path d="M6 20C5 13 7 7 10 3M12 21c-1-7 0-12 3-17M18 20c0-6 1-10 3-14" stroke-width="2.2"/>',
   fang: '<path d="M5 6h14c0 6-2 9-4 13-1-2-1-4-3-4s-2 2-3 4C7 15 5 12 5 6z" class="f"/>',

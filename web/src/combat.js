@@ -9,7 +9,7 @@ DS.newCombat = function (allies, enemy, seed, policies) {
   };
 };
 
-function log(state, msg) { state.log.push('R' + state.round + ' ' + msg); }
+function log(state, msg) { state.log.push((state.logPrefix || 'R') + state.round + ' ' + msg); }
 const eff = (c, s) => DS.effStat(c, s);
 const rnd = (state) => DS.rand(state.rng);
 const f1 = (x) => (Math.round(x * 10) / 10).toFixed(1);

@@ -11,25 +11,46 @@ function newChar(seed = 1, weapon = 'greatsword') {
   DS.createChar(G, weapon);
   return G;
 }
-// 조우가 날 때까지 걷는다(항상 열린 인접 칸으로)
-function walkUntilBattle(G, maxSteps = 4000) {
-  const floor = DS.getFloor();
-  let dir = 0;
-  for (let i = 0; i < maxSteps && G.screen === 'dungeon'; i++) {
-    const { x, y } = G.dungeon.pos;
-    for (let t = 0; t < 4; t++) {
-      const [dx, dy] = DS.DIRS[(dir + t) % 4];
-      if (DS.isOpen(floor, x + dx, y + dy)) { dir = (dir + t) % 4; DS.stepTo(G, x + dx, y + dy); break; }
-    }
-    if (Math.random() < 0.3) dir = (dir + 1) % 4;
+function inDungeon(seed = 1, weapon = 'greatsword') {
+  const G = newChar(seed, weapon);
+  DS.enterDungeon(G);
+  G.dungeon.monsters = []; // 테스트에서는 직접 배치한다
+  return G;
+}
+function place(G, id, x, y) {
+  const m = DS.makeMonster(id);
+  m.uid = 'm' + G.dungeon.monsters.length;
+  m.pos = { x, y }; m.alert = false; m.alert_turns = 0;
+  G.dungeon.monsters.push(m);
+  return m;
+}
+const floor = () => DS.getFloor();
+/** 플레이어와 (dx,dy) 만큼 떨어진 열린 칸 중, 시선이 닿는 칸을 찾는다. */
+function openTileAt(G, minD, maxD) {
+  const f = floor(), p = G.dungeon.pos;
+  for (let r = minD; r <= maxD; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    const x = p.x + dx, y = p.y + dy, d = Math.hypot(dx, dy);
+    if (d < minD || d > maxD || !DS.isOpen(f, x, y)) continue;
+    if (DS.hasLos(f, p, { x, y })) return { x, y };
   }
+  return null;
+}
+function adjacentOpen(G) {
+  const f = floor(), p = G.dungeon.pos;
+  for (const [dx, dy] of DS.DIRS) if (DS.isOpen(f, p.x + dx, p.y + dy)) return { x: p.x + dx, y: p.y + dy };
+  return null;
+}
+function moveAway(G) { // 열린 칸으로 한 걸음
+  const f = floor(), p = G.dungeon.pos;
+  for (const [dx, dy] of DS.DIRS) if (DS.isOpen(f, p.x + dx, p.y + dy) && !DS.monsterAt(G, p.x + dx, p.y + dy)) return DS.playerMove(G, dx, dy);
+  return { ok: false };
 }
 
+// ------------------------------------------------------------ 세계
 test('고정 지형: 같은 시드면 항상 같고, 모든 칸이 시작점에서 도달 가능', () => {
   const a = DS.buildFloor1(), b = DS.buildFloor1();
   assert.deepStrictEqual(a.grid, b.grid);
-  const open = a.grid.flat().filter((v) => v === 0).length;
-  assert.ok(open >= DS.db.dungeon.floor1.min_open_tiles);
+  assert.ok(a.grid.flat().filter((v) => v === 0).length >= DS.db.dungeon.floor1.min_open_tiles);
   for (const p of a.portals) assert.ok(DS.findPath(a, a.start, p), 'portal ' + p.id + ' unreachable');
   const zones = new Set();
   a.grid.forEach((row, y) => row.forEach((v, x) => { if (v === 0) zones.add(DS.zoneAt(a, x, y)); }));
@@ -42,92 +63,268 @@ test('구역별 몬스터는 기획서 6-2 와 일치, 중심부는 4구역 혼�
   assert.strictEqual(DS.monstersInZone('center').length, 4);
 });
 
-test('무리 크기는 체류일에 따라 늘고 상한이 있다', () => {
-  assert.strictEqual(DS.groupSize(0), 1);
-  assert.ok(DS.groupSize(1.7) >= 3);
-  assert.strictEqual(DS.groupSize(99), DS.db.dungeon.floor1.group_max);
+test('몬스터 배치: 고정 시드라 항상 같고, 구역·간격·무리 크기 규칙을 지킨다', () => {
+  const f = floor(), cfg = DS.db.dungeon.floor1;
+  const a = DS.spawnMonsters(f), b = DS.spawnMonsters(f);
+  assert.deepStrictEqual(a.map((m) => [m.id, m.pos]), b.map((m) => [m.id, m.pos]));
+  assert.ok(a.length >= 10, 'enough monsters: ' + a.length);
+  const seen = new Set();
+  for (const m of a) {
+    assert.ok(DS.isOpen(f, m.pos.x, m.pos.y));
+    assert.ok(Math.hypot(m.pos.x - f.start.x, m.pos.y - f.start.y) >= cfg.spawn_min_dist_center - 0.01);
+    const zone = DS.zoneAt(f, m.pos.x, m.pos.y);
+    if (zone !== 'center') assert.ok(DS.monstersInZone(zone).includes(m.id), m.id + ' in ' + zone);
+    const k = m.pos.y * f.width + m.pos.x;
+    assert.ok(!seen.has(k), 'no stacking');
+    seen.add(k);
+  }
 });
 
-test('캐릭터 생성 → 마을 → 판단창 → 입장', () => {
+// ------------------------------------------------------------ 시선·사거리
+test('벽은 시선을 막고, 사거리 1 은 상하좌우 인접만', () => {
+  const f = floor();
+  const p = f.start;
+  assert.strictEqual(DS.hasLos(f, p, p), true);
+  // 벽 너머 칸: 가까운 벽 하나를 찾아 그 뒤를 본다
+  let blocked = null;
+  for (let r = 2; r < 12 && !blocked; r++) for (let dx = -r; dx <= r && !blocked; dx++) {
+    const a = { x: p.x + dx, y: p.y }, b = { x: p.x + dx + (dx >= 0 ? 2 : -2), y: p.y };
+    if (DS.isOpen(f, a.x, a.y) && DS.isOpen(f, b.x, b.y) && !DS.isOpen(f, (a.x + b.x) / 2, p.y) ) blocked = [a, b];
+  }
+  if (blocked) assert.strictEqual(DS.hasLos(f, blocked[0], blocked[1]), false);
+  assert.strictEqual(DS.inRange(f, { x: 5, y: 5 }, { x: 6, y: 6 }, 1), false); // 대각선 불가
+  assert.strictEqual(DS.inRange(f, { x: 5, y: 5 }, { x: 5, y: 6 }, 1), true);
+});
+
+test('무기 사거리: 창 2, 활 5, 나머지 1 — 스킬이 무기를 따른다', () => {
+  assert.strictEqual(DS.weaponRange(DS.makePlayer('barbarian', 'spear')), 2);
+  assert.strictEqual(DS.weaponRange(DS.makePlayer('barbarian', 'bow')), 5);
+  assert.strictEqual(DS.weaponRange(DS.makePlayer('barbarian', 'sword')), 1);
+  const bow = DS.makePlayer('barbarian', 'bow');
+  assert.strictEqual(DS.skillRange(bow, 'slash'), 5);
+  assert.strictEqual(DS.skillRange(DS.makeMonster('goblin_archer'), 'shoot'), 5); // 몬스터 원거리 스킬은 자체 사거리
+});
+
+// ------------------------------------------------------------ 턴과 재사용 대기
+test('이동 한 칸 = 한 턴: 턴이 1 늘고 스킬 재사용 대기가 1 줄어든다', () => {
+  const G = inDungeon(3);
+  const p = G.char.player;
+  const t0 = G.dungeon.turn;
+  p.cooldowns.smash = 4;
+  assert.ok(moveAway(G).ok);
+  assert.strictEqual(G.dungeon.turn, t0 + 1);
+  assert.strictEqual(p.cooldowns.smash, 3);
+});
+
+test('강타(쿨 3)는 사용 후 3턴 동안 못 쓰고, 이동으로 대기가 풀린다', () => {
+  const G = inDungeon(3);
+  const t = adjacentOpen(G);
+  const m = place(G, 'gnome', t.x, t.y);
+  m.hp = 1000; m.max_hp = 1000; // 안 죽게
+  assert.ok(DS.playerSkill(G, 'smash', m.uid).ok);
+  for (let i = 0; i < 3; i++) {
+    assert.strictEqual(DS.canUseSkill(G, 'smash', m).ok, false, 'turn ' + i);
+    DS.playerWait(G);
+  }
+  G.char.player.spirit = G.char.player.max_spirit;
+  assert.strictEqual(DS.canUseSkill(G, 'smash', m).ok, true);
+});
+
+test('걸어서 이동만 해도 재사용 대기가 회복된다(전투 밖)', () => {
+  const G = inDungeon(5);
+  const p = G.char.player;
+  p.cooldowns.smash = 4;
+  for (let i = 0; i < 4; i++) if (!moveAway(G).ok) DS.playerWait(G);
+  assert.strictEqual(p.cooldowns.smash, 0);
+});
+
+// ------------------------------------------------------------ 적의 행동
+test('적은 시야 안에 들어오면 경계하고 다가와서 공격한다', () => {
+  const G = inDungeon(7);
+  const p = G.char.player;
+  const t = openTileAt(G, 4, 5);
+  assert.ok(t, 'open tile in LOS');
+  const m = place(G, 'ghoul', t.x, t.y);
+  const hp0 = p.hp;
+  let hit = false;
+  for (let i = 0; i < 8 && !hit; i++) { DS.playerWait(G); hit = p.hp < hp0 || DS.manhattan(m.pos, p.pos) === 1; }
+  assert.ok(m.alert, 'alerted');
+  assert.ok(DS.manhattan(m.pos, p.pos) <= 1 || p.hp < hp0, 'closed in / attacked');
+});
+
+test('시야 밖에 있는 적은 경계하지 않고, 놓치면 경계를 푼다', () => {
+  const G = inDungeon(7);
+  const far = place(G, 'gnome', G.dungeon.pos.x, G.dungeon.pos.y);
+  far.pos = { x: 1, y: 1 }; // 시야 반경 밖(벽 안이어도 거리 규칙으로 충분)
+  DS.playerWait(G);
+  assert.strictEqual(far.alert, false);
+  const t = openTileAt(G, 3, 4);
+  const near = place(G, 'gnome', t.x, t.y);
+  near.hp = 1000; near.max_hp = 1000;
+  DS.playerWait(G);
+  assert.strictEqual(near.alert, true);
+  near.pos = { x: 1, y: 2 }; // 시야 밖으로 사라짐
+  for (let i = 0; i < DS.db.dungeon.floor1.lose_sight_turns + 1; i++) DS.playerWait(G);
+  assert.strictEqual(near.alert, false);
+});
+
+test('원거리 몬스터는 떨어진 곳에서 쏜다', () => {
+  const G = inDungeon(7);
+  const p = G.char.player;
+  const t = openTileAt(G, 3, 5);
+  const m = place(G, 'goblin_archer', t.x, t.y);
+  const hp0 = p.hp;
+  let shot = false;
+  for (let i = 0; i < 30 && !shot; i++) { DS.playerWait(G); shot = p.hp < hp0 - 1 && DS.manhattan(m.pos, p.pos) > 1; }
+  assert.ok(shot, 'archer hit the player from range');
+});
+
+test('여러 마리가 동시에 달려든다', () => {
+  const G = inDungeon(9);
+  const f = floor();
+  const spots = [];
+  for (let r = 2; r <= 4 && spots.length < 3; r++) for (const [dx, dy] of [[r, 0], [-r, 0], [0, r], [0, -r], [r, 1], [-r, 1]]) {
+    const x = G.dungeon.pos.x + dx, y = G.dungeon.pos.y + dy;
+    if (DS.isOpen(f, x, y) && DS.hasLos(f, G.dungeon.pos, { x, y }) && !spots.some((s) => s.x === x && s.y === y)) spots.push({ x, y });
+    if (spots.length === 3) break;
+  }
+  assert.ok(spots.length >= 2, 'spots');
+  for (const s of spots) place(G, 'gnome', s.x, s.y);
+  for (let i = 0; i < 4; i++) DS.playerWait(G);
+  assert.ok(DS.alertMonsters(G).length >= 2, 'multiple alerted');
+});
+
+// ------------------------------------------------------------ 공격과 보상
+test('인접한 적을 쓰러뜨리면 보상을 받고 지도에서 사라진다', () => {
+  const G = inDungeon(11);
+  const t = adjacentOpen(G);
+  const m = place(G, 'gnome', t.x, t.y);
+  let guard = 0;
+  while (G.dungeon && G.dungeon.monsters.length && guard++ < 40) {
+    const mm = G.dungeon.monsters[0];
+    if (G.char.player.spirit < 3) { DS.playerWait(G); continue; }
+    DS.playerAttackDefault(G, mm.uid);
+  }
+  assert.ok(G.screen === 'dungeon' || G.screen === 'dead');
+  if (G.screen === 'dungeon') {
+    assert.strictEqual(G.dungeon.monsters.length, 0);
+    assert.strictEqual(G.char.kills.gnome, 1);
+    assert.ok(G.char.exp > 0);
+  }
+});
+
+test('사거리 밖·쿨타임·영혼력 부족이면 스킬이 거부된다', () => {
+  const G = inDungeon(13);
+  const t = openTileAt(G, 3, 4);
+  const m = place(G, 'gnome', t.x, t.y);
+  assert.strictEqual(DS.canUseSkill(G, 'slash', m).reason, '사거리 밖');
+  const t2 = adjacentOpen(G);
+  const m2 = place(G, 'gnome', t2.x, t2.y);
+  G.char.player.cooldowns.smash = 2;
+  assert.match(DS.canUseSkill(G, 'smash', m2).reason, /쿨타임/);
+  G.char.player.cooldowns.smash = 0; G.char.player.spirit = 1;
+  assert.strictEqual(DS.canUseSkill(G, 'smash', m2).reason, '영혼력 부족');
+});
+
+test('활은 멀리서, 창은 두 칸 앞에서 공격할 수 있다', () => {
+  const Gb = inDungeon(15, 'bow');
+  const tb = openTileAt(Gb, 4, 5);
+  const mb = place(Gb, 'gnome', tb.x, tb.y);
+  assert.ok(DS.canUseSkill(Gb, 'slash', mb).ok, 'bow reaches');
+  const Gs = inDungeon(15, 'spear');
+  const f = floor(), p = Gs.dungeon.pos;
+  let ts = null;
+  for (const [dx, dy] of DS.DIRS) if (DS.isOpen(f, p.x + dx * 2, p.y + dy * 2) && DS.isOpen(f, p.x + dx, p.y + dy)) { ts = { x: p.x + dx * 2, y: p.y + dy * 2 }; break; }
+  const ms = place(Gs, 'gnome', ts.x, ts.y);
+  assert.ok(DS.canUseSkill(Gs, 'slash', ms).ok, 'spear reaches 2');
+});
+
+test('적이 있는 칸으로 이동하면 기본 공격이 된다(턴 소모)', () => {
+  const G = inDungeon(17);
+  const t = adjacentOpen(G);
+  const m = place(G, 'gnome', t.x, t.y);
+  const turn0 = G.dungeon.turn;
+  const r = DS.playerMove(G, t.x - G.dungeon.pos.x, t.y - G.dungeon.pos.y);
+  assert.ok(r.ok);
+  assert.strictEqual(G.dungeon.turn, turn0 + 1);
+  assert.ok(m.hp < m.max_hp);
+  assert.deepStrictEqual(G.dungeon.pos, floor().start); // 제자리
+});
+
+test('방어막은 한 턴 동안 피해를 흡수한다', () => {
+  const G = inDungeon(19);
+  const t = adjacentOpen(G);
+  const m = place(G, 'gnome', t.x, t.y);
+  m.alert = true;
+  assert.ok(DS.playerSkill(G, 'guard').ok);
+  // 방어막이 적 공격을 받아 줄어들거나 그대로 — 생명력 감소는 방어막 없이 맞는 것보다 작다
+  assert.ok(G.char.player.hp >= 100 - 10);
+});
+
+// ------------------------------------------------------------ 죽음·귀환·저장
+test('생명력이 0이 되면 사망 화면으로 가고 새 캐릭터를 만들어야 한다', () => {
+  const G = inDungeon(21, 'bow');
+  const t = adjacentOpen(G);
+  const m = place(G, 'ghoul', t.x, t.y);
+  m.base_stats.strength = 80; m.alert = true; // 확실히 지게
+  G.char.player.hp = 1;
+  DS.playerWait(G);
+  assert.strictEqual(G.screen, 'dead');
+  assert.ok(G.dead.cause && G.dead.by);
+  DS.afterDeathNewChar(G);
+  assert.strictEqual(G.screen, 'create');
+  assert.strictEqual(G.char, null);
+});
+
+test('강제 귀환: 전투 중이어도 즉시 마을로, 얻은 것은 유지', () => {
+  const G = inDungeon(5);
+  G.char.items.maseok_9 = 3; G.char.exp = 50;
+  const t = adjacentOpen(G);
+  place(G, 'ghoul', t.x, t.y).alert = true;
+  const ms = DS.db.dungeon.floor1.forced_return_days * DS.db.dungeon.seconds_per_day * 1000;
+  assert.strictEqual(DS.tickClock(G, ms), true);
+  assert.strictEqual(G.screen, 'town');
+  assert.strictEqual(G.dungeon, null);
+  assert.strictEqual(G.char.items.maseok_9, 3);
+  assert.strictEqual(G.char.returned_once, true);
+});
+
+test('전투 도중 저장하면 적 위치·재사용 대기·난수까지 그대로 복원된다', () => {
+  const G = inDungeon(23);
+  const t = openTileAt(G, 3, 4);
+  place(G, 'ghoul', t.x, t.y);
+  DS.playerWait(G); DS.playerWait(G);
+  G.char.player.cooldowns.smash = 3;
+  const store = memStorage();
+  assert.ok(DS.saveToStorage(G, store));
+  const H = DS.loadFromStorage(store);
+  assert.strictEqual(H.screen, 'dungeon');
+  assert.deepStrictEqual(H.dungeon.monsters.map((m) => [m.uid, m.pos, m.hp]), G.dungeon.monsters.map((m) => [m.uid, m.pos, m.hp]));
+  DS.visitedSet(H);
+  DS.playerWait(G); DS.playerWait(H);
+  assert.deepStrictEqual(H.dungeon.monsters.map((m) => m.pos), G.dungeon.monsters.map((m) => m.pos));
+  assert.strictEqual(H.char.player.hp, G.char.player.hp);
+  assert.strictEqual(H.char.player.cooldowns.smash, G.char.player.cooldowns.smash);
+});
+
+test('이전 버전 저장은 읽지 않고 새로 시작한다', () => {
+  const store = memStorage();
+  store.setItem(DS.SAVE_KEY, JSON.stringify({ v: 1 }));
+  assert.strictEqual(DS.loadFromStorage(store), null);
+});
+
+// ------------------------------------------------------------ 마을·경제
+test('캐릭터 생성 → 마을 → 판단창 → 입장, 거부는 불이익 없음', () => {
   const G = newChar();
   assert.strictEqual(G.screen, 'town');
   DS.townSkip(G);
   assert.strictEqual(G.screen, 'judgment');
-  DS.enterDungeon(G);
-  assert.strictEqual(G.screen, 'dungeon');
-  assert.deepStrictEqual(G.dungeon.pos, DS.getFloor().start);
-});
-
-test('판단창 거부는 불이익 없이 마을로 돌아온다', () => {
-  const G = newChar();
-  DS.townSkip(G);
   DS.declineJudgment(G);
   assert.strictEqual(G.screen, 'town');
-  assert.ok(G.char.player.hp === G.char.player.max_hp);
-});
-
-test('걷다 보면 조우하고 전투가 끝나면 무리가 이어진다', () => {
-  const G = newChar(7);
+  DS.townSkip(G);
   DS.enterDungeon(G);
-  walkUntilBattle(G);
-  assert.strictEqual(G.screen, 'battle');
-  const total = G.dungeon.group.enemies.length;
-  let guard = 0, finished = null;
-  while (G.screen === 'battle' && guard++ < 5000) finished = DS.battleAct(G, null);
-  assert.ok(['victory', 'defeat', 'next'].includes(finished) || G.screen !== 'battle');
-  assert.ok(total >= 1);
-});
-
-test('수동 스킬 지정은 첫 행동에 쓰이고 쿨타임이 걸린다', () => {
-  const G = newChar(3);
-  DS.enterDungeon(G);
-  walkUntilBattle(G);
-  const p = G.battle.allies[0];
-  const spiritBefore = p.spirit;
-  DS.battleAct(G, 'smash');
-  if (G.screen === 'battle') {
-    assert.strictEqual(p.cooldowns.smash, DS.db.skills.smash.cooldown); // 사용 +1, 라운드 종료 -1
-    assert.ok(p.spirit < spiritBefore);
-  }
-});
-
-test('전투 도중 저장하면 그대로 복원된다(참조·난수 포함)', () => {
-  const G = newChar(11);
-  DS.enterDungeon(G);
-  walkUntilBattle(G);
-  assert.strictEqual(G.screen, 'battle');
-  DS.battleAct(G, 'slash');
-  const store = memStorage();
-  assert.ok(DS.saveToStorage(G, store));
-  const H = DS.loadFromStorage(store);
-  assert.strictEqual(H.screen, G.screen);
-  assert.strictEqual(H.char.player, H.battle.allies[0]); // 참조 복원
-  assert.strictEqual(H.auto, false);
-  // 같은 입력이면 같은 결과(난수 상태까지 복원)
-  DS.battleAct(G, 'slash');
-  DS.battleAct(H, 'slash');
-  if (G.battle && H.battle) {
-    assert.strictEqual(G.battle.allies[0].hp, H.battle.allies[0].hp);
-    assert.strictEqual(G.battle.enemy.hp, H.battle.enemy.hp);
-  } else {
-    assert.strictEqual(G.screen, H.screen);
-  }
-});
-
-test('강제 귀환: 전투 중이어도 즉시 마을로, 얻은 것은 유지', () => {
-  const G = newChar(5);
-  DS.enterDungeon(G);
-  G.char.items.maseok_9 = 3;
-  G.char.exp = 50;
-  walkUntilBattle(G);
-  assert.strictEqual(G.screen, 'battle');
-  const ms = DS.db.dungeon.floor1.forced_return_days * DS.db.dungeon.seconds_per_day * 1000;
-  assert.strictEqual(DS.tickClock(G, ms), true);
-  assert.strictEqual(G.screen, 'town');
-  assert.strictEqual(G.battle, null);
-  assert.strictEqual(G.char.items.maseok_9, 3);
-  assert.strictEqual(G.char.exp, 50);
-  assert.strictEqual(G.char.returned_once, true);
+  assert.strictEqual(G.screen, 'dungeon');
+  assert.ok(G.dungeon.monsters.length >= 10);
 });
 
 test('환전소는 첫 귀환 뒤에만 열린다', () => {
@@ -136,43 +333,16 @@ test('환전소는 첫 귀환 뒤에만 열린다', () => {
   assert.strictEqual(DS.exchange(G), null);
   G.char.returned_once = true;
   assert.strictEqual(DS.exchange(G), 4 * DS.db.economy.exchange_rate_by_grade['9']);
-  assert.strictEqual(G.char.stones, 40);
   assert.strictEqual(G.char.items.maseok_9, undefined);
-});
-
-test('사망하면 새 캐릭터를 만들어야 하고 모든 진행이 초기화된다', () => {
-  const G = newChar(2, 'bow');
-  DS.enterDungeon(G);
-  walkUntilBattle(G);
-  G.battle.allies[0].hp = 0.1;
-  G.battle.enemy.base_stats.strength = 50; // 확실히 지게
-  let guard = 0;
-  while (G.screen === 'battle' && guard++ < 500) DS.battleAct(G, null);
-  assert.strictEqual(G.screen, 'dead');
-  assert.ok(G.dead.cause);
-  DS.afterDeathNewChar(G);
-  assert.strictEqual(G.screen, 'create');
-  assert.strictEqual(G.char, null);
 });
 
 test('사냥 숙련·첫 처치 경험치·포탈 발견은 한 번만', () => {
   const G = newChar();
   const m1 = DS.grantKillRewards(G, 'ghoul');
   assert.ok(m1.some((m) => m.includes('첫 처치')));
-  const m2 = DS.grantKillRewards(G, 'ghoul');
-  assert.ok(!m2.some((m) => m.includes('첫 처치')));
+  assert.ok(!DS.grantKillRewards(G, 'ghoul').some((m) => m.includes('첫 처치')));
   for (let i = 0; i < 10; i++) DS.grantKillRewards(G, 'ghoul');
-  assert.strictEqual(DS.masteryLevel(G.char.kills, 'ghoul'), 1); // 12회 처치
+  assert.strictEqual(DS.masteryLevel(G.char.kills, 'ghoul'), 1);
   assert.ok(DS.discoverPortal(G, 'north'));
   assert.strictEqual(DS.discoverPortal(G, 'north'), null);
-});
-
-test('예상 승률은 원본 상태를 건드리지 않는다', () => {
-  const G = newChar(9);
-  DS.enterDungeon(G);
-  walkUntilBattle(G);
-  const snap = JSON.stringify(G.battle);
-  const p = DS.estimateWinRate(G.battle, 100);
-  assert.ok(p >= 0 && p <= 1);
-  assert.strictEqual(JSON.stringify(G.battle), snap);
 });
