@@ -311,8 +311,13 @@
     canvas.addEventListener('pointerdown', onMapTap);
     const dir = (name, label, glyph, dx, dy) => {
       const b = h('button', { class: name, 'aria-label': label }, glyph);
-      b.addEventListener('pointerdown', (e) => { e.preventDefault(); ui.walk = []; ui.held = [dx, dy]; });
-      for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => { ui.held = null; });
+      b.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        try { b.setPointerCapture(e.pointerId); } catch (err) { /* 일부 브라우저는 캡처를 못 한다 */ }
+        ui.walk = []; ui.held = [dx, dy];
+      });
+      // 손가락이 버튼 밖으로 살짝 벗어나도 놓을 때까지 계속 걷는다(포인터 캡처).
+      for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(ev, () => { ui.held = null; });
       return b;
     };
     const p = G.char.player;
@@ -609,6 +614,8 @@
     if (G.dungeon) DS.visitedSet(G);
     if (G.screen === 'judgment') G.judgment = G.judgment || { remaining_ms: DS.db.dungeon.judgment_seconds * 1000 };
     if (G.char) G.msgs.push('이어하기: 저장된 상태에서 계속합니다.');
+    // 꾹 누르기 메뉴(복사·공유 등)가 조작 중에 뜨지 않게 막는다. 전투 로그·툴팁 글자는 선택할 수 있다.
+    app.addEventListener('contextmenu', (e) => { if (!e.target.closest('.battlelog, .tip')) e.preventDefault(); });
     window.addEventListener('keydown', onKey);
     window.addEventListener('keyup', () => { ui.held = null; });
     window.addEventListener('resize', onMapDraw);

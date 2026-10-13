@@ -31,6 +31,24 @@ const url = 'file://' + path.join(__dirname, '..', 'dist', 'play.html');
   await page.waitForTimeout(300);
   await shot('4-dungeon');
 
+  // 꾹 누르기: D패드를 길게 눌러도 글자가 선택되지 않고 계속 걷는다
+  const noSelect = await page.evaluate(() => {
+    const cs = getComputedStyle(document.querySelector('.dpad .right'));
+    return cs.userSelect === 'none' && getComputedStyle(document.getElementById('map')).userSelect === 'none';
+  });
+  assert.ok(noSelect, 'user-select none on map controls');
+  await page.evaluate(() => { window.__enc = DS.db.dungeon.floor1.encounter_chance; DS.db.dungeon.floor1.encounter_chance = 0; }); // 이 구간은 조우 없이
+  const dp = await page.locator('.dpad .right').boundingBox();
+  const p0 = await page.evaluate(() => JSON.stringify(window.__G.dungeon.pos));
+  await page.mouse.move(dp.x + dp.width / 2, dp.y + dp.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(900);
+  const selected = await page.evaluate(() => String(window.getSelection()));
+  await page.mouse.up();
+  assert.strictEqual(selected, '', 'long press must not select text');
+  const p1 = await page.evaluate(() => JSON.stringify(window.__G.dungeon.pos));
+  assert.notStrictEqual(p1, p0, 'held D-pad keeps walking');
+
   // 지도 탭으로 걷기: 시작점에서 보이는 열린 칸 하나를 탭한다
   const before = await page.evaluate(() => JSON.stringify(window.__G.dungeon.pos));
   const target = await page.evaluate(() => {
@@ -62,6 +80,7 @@ const url = 'file://' + path.join(__dirname, '..', 'dist', 'play.html');
 
   // 조우가 날 때까지 걷게 한다(규칙 함수 직접 호출) → 화면 갱신
   await page.evaluate(() => {
+    DS.db.dungeon.floor1.encounter_chance = window.__enc;
     const G = window.__G, f = DS.getFloor();
     let dir = 0;
     for (let i = 0; i < 20000 && G.screen === 'dungeon'; i++) {

@@ -223,3 +223,10 @@ button.slot { cursor: pointer; }
 .enemyart { height: 104px; display: grid; place-items: center; background: radial-gradient(circle at 50% 55%, #3a2b34, #14151d 72%); border: 1px solid var(--win-lo); color: #9a8f9f; }
 .enemyart svg { width: 76px; height: 76px; filter: drop-shadow(0 0 10px #7a2f3a88); }
 #modal { background: #000d; }
+
+/* 게임 화면에서는 꾹 눌러도 글자가 선택되거나 길게 누르기 메뉴가 뜨지 않게 한다(조작 중 오작동 방지). */
+#app { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.battlelog, .tip { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+button, .slot, .win-x { touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+.stage, .stage canvas, .dpad, .dpad button { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+canvas { -webkit-tap-highlight-color: transparent; }
