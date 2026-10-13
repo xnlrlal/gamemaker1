@@ -9,7 +9,7 @@ import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-ORDER = ["rng", "entities", "combat", "world", "game", "ui"]
+ORDER = ["rng", "entities", "combat", "world", "game", "icons", "ui"]
 FONTS = ("https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@800&"
          "family=Noto+Sans+KR:wght@400;600;700&display=swap")
 

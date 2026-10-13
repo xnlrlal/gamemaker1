@@ -136,17 +136,17 @@
 
   "equipment": {
     "weapons": {
-      "spear":      { "name_ko": "창",     "slot": "weapon", "bonuses": { "strength": 2 } },
-      "sword":      { "name_ko": "검",     "slot": "weapon", "bonuses": { "strength": 1, "phys_res": 1 } },
-      "mace":       { "name_ko": "둔기",   "slot": "weapon", "bonuses": { "strength": 2, "phys_res": 1 } },
-      "shield":     { "name_ko": "방패",   "slot": "weapon", "bonuses": { "phys_res": 2 } },
-      "greatsword": { "name_ko": "대검",   "slot": "weapon", "bonuses": { "strength": 3 } },
-      "bow":        { "name_ko": "활",     "slot": "weapon", "bonuses": { "accuracy": 3 } }
+      "spear":      { "name_ko": "창", "desc": "긴 자루 끝에 날을 단 창. 거리를 두고 찌르기에 좋다.",     "slot": "weapon", "bonuses": { "strength": 2 } },
+      "sword":      { "name_ko": "검", "desc": "균형 잡힌 한 손 검. 막기도 베기도 무난하다.",     "slot": "weapon", "bonuses": { "strength": 1, "phys_res": 1 } },
+      "mace":       { "name_ko": "둔기", "desc": "묵직한 둔기. 뼈와 갑옷을 가리지 않고 두드린다.",   "slot": "weapon", "bonuses": { "strength": 2, "phys_res": 1 } },
+      "shield":     { "name_ko": "방패", "desc": "두꺼운 나무에 쇠를 덧댄 방패. 공격보다 버티기에 알맞다.",   "slot": "weapon", "bonuses": { "phys_res": 2 } },
+      "greatsword": { "name_ko": "대검", "desc": "원래 양손으로 휘두르는 대검. 바바리안은 한 손으로 든다.",   "slot": "weapon", "bonuses": { "strength": 3 } },
+      "bow":        { "name_ko": "활", "desc": "사냥용 활. 화살 소모는 아직 구현되지 않았다.",     "slot": "weapon", "bonuses": { "accuracy": 3 } }
     },
     "armor": {
-      "cloth_top":    { "name_ko": "천 상의", "slot": "top",    "bonuses": { "phys_res": 1 }, "durability": 15 },
-      "cloth_bottom": { "name_ko": "천 하의", "slot": "bottom", "bonuses": { "phys_res": 2 }, "durability": null },
-      "sandals":      { "name_ko": "샌들",    "slot": "shoes",  "bonuses": { "regen": 2 },    "durability": 6 }
+      "cloth_top":    { "name_ko": "천 상의", "desc": "거칠게 짠 천 상의. 오래 입으면 해진다.", "slot": "top",    "bonuses": { "phys_res": 1 }, "durability": 15 },
+      "cloth_bottom": { "name_ko": "천 하의", "desc": "질긴 천 하의.", "slot": "bottom", "bonuses": { "phys_res": 2 }, "durability": null },
+      "sandals":      { "name_ko": "샌들", "desc": "가볍고 쉽게 망가지는 샌들. 발이 가벼워 숨이 덜 가쁘다.",    "slot": "shoes",  "bonuses": { "regen": 2 },    "durability": 6 }
     },
     "barbarian_starter_armor": ["cloth_top", "cloth_bottom", "sandals"]
   },

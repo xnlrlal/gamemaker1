@@ -43,11 +43,22 @@ const url = 'file://' + path.join(__dirname, '..', 'dist', 'play.html');
   });
   assert.ok(target, 'walkable tile near start');
   const box = await page.locator('#map').boundingBox();
-  const ts = 40 * (box.width / 480);
+  const ts = 44; // 지도 타일 한 칸의 CSS 픽셀 크기
   await page.touchscreen.tap(box.x + box.width / 2 + target.dx * ts, box.y + box.height / 2 + target.dy * ts);
   await page.waitForTimeout(1200);
   const after = await page.evaluate(() => JSON.stringify(window.__G.dungeon.pos));
   assert.notStrictEqual(after, before, 'player moved after tap');
+
+  // 소지품·캐릭터 창을 열고 닫는다
+  await page.click('button[aria-label="소지품"]');
+  await page.waitForSelector('.win-title:has-text("소지품")');
+  await page.click('button[aria-label="대검"]');
+  await shot('4b-inventory');
+  await page.click('.win-x');
+  await page.click('button[aria-label="캐릭터"]');
+  await page.waitForSelector('.win-title:has-text("캐릭터")');
+  await shot('4c-character');
+  await page.click('.win-x');
 
   // 조우가 날 때까지 걷게 한다(규칙 함수 직접 호출) → 화면 갱신
   await page.evaluate(() => {
