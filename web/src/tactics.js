@@ -189,7 +189,10 @@ function monsterChoose(G, m, p) {
 function monsterTurn(G, ts, m) {
   const floor = DS.getFloor(), cfg = DS.db.dungeon.floor1, p = G.char.player;
   const dist = Math.hypot(m.pos.x - p.pos.x, m.pos.y - p.pos.y);
-  const sees = dist <= cfg.sight_radius && DS.hasLos(floor, m.pos, p.pos);
+  // 처음 눈치채는 건 둘러싼 8칸(aggro_radius) 안에 들어왔을 때뿐 — 멀리서 보이는 것만으로는 선공하지 않는다.
+  // 한 번 눈치챈 뒤에는 시야 반경 안에서 시선이 닿는 동안 계속 쫓는다.
+  const near = Math.max(Math.abs(m.pos.x - p.pos.x), Math.abs(m.pos.y - p.pos.y)) <= cfg.aggro_radius;
+  const sees = m.alert ? dist <= cfg.sight_radius && DS.hasLos(floor, m.pos, p.pos) : near;
   if (sees) {
     if (!m.alert) { ts.log.push('T' + ts.round + ' ' + m.name + '이(가) 당신을 발견했다!'); m.alert = true; }
     m.alert_turns = cfg.lose_sight_turns;
@@ -339,6 +342,7 @@ DS.playerSkill = function (G, sid, uid) {
   if (!chk.ok) return chk;
   const ts = tstate(G);
   playerTurnStart(G);
+  if (target) target.alert = true; // 공격을 받으면 멀리서도 반격하러 온다
   // 방어는 자기 턴 시작에 사라지므로 사용 직후 새로 쌓는다
   useSkill(G, ts, G.char.player, sid, target);
   DS.worldTick(G);

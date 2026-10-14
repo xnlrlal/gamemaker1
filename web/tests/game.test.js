@@ -197,26 +197,34 @@ test('걸어서 이동만 해도 재사용 대기가 회복된다(전투 밖)', 
 });
 
 // ------------------------------------------------------------ 적의 행동
-test('적은 시야 안에 들어오면 경계하고 다가와서 공격한다', () => {
+test('멀리서 보이는 적은 선공하지 않는다(둘러싼 8칸 안에 들어와야 눈치챈다)', () => {
   const G = inDungeon(7);
-  const p = G.char.player;
   const t = openTileAt(G, 4, 5);
   assert.ok(t, 'open tile in LOS');
   const m = place(G, 'ghoul', t.x, t.y);
-  const hp0 = p.hp;
-  let hit = false;
-  for (let i = 0; i < 8 && !hit; i++) { DS.playerWait(G); hit = p.hp < hp0 || DS.manhattan(m.pos, p.pos) === 1; }
-  assert.ok(m.alert, 'alerted');
-  assert.ok(DS.manhattan(m.pos, p.pos) <= 1 || p.hp < hp0, 'closed in / attacked');
+  for (let i = 0; i < 6; i++) DS.playerWait(G);
+  assert.strictEqual(m.alert, false);
+  assert.deepStrictEqual(m.pos, t);
 });
 
-test('시야 밖에 있는 적은 경계하지 않고, 놓치면 경계를 푼다', () => {
+test('가까이(인접 8칸) 가면 눈치채고 공격한다', () => {
+  const G = inDungeon(7);
+  const p = G.char.player;
+  const t = adjacentOpen(G);
+  const m = place(G, 'ghoul', t.x, t.y);
+  const hp0 = p.hp;
+  for (let i = 0; i < 6 && p.hp >= hp0; i++) DS.playerWait(G);
+  assert.ok(m.alert, 'alerted');
+  assert.ok(p.hp < hp0, 'attacked');
+});
+
+test('눈치챈 적은 시야 밖으로 벗어나면 놓친다', () => {
   const G = inDungeon(7);
   const far = place(G, 'gnome', G.dungeon.pos.x, G.dungeon.pos.y);
-  far.pos = { x: 1, y: 1 }; // 시야 반경 밖(벽 안이어도 거리 규칙으로 충분)
+  far.pos = { x: 1, y: 1 }; // 시야 반경 밖
   DS.playerWait(G);
   assert.strictEqual(far.alert, false);
-  const t = openTileAt(G, 3, 4);
+  const t = adjacentOpen(G);
   const near = place(G, 'gnome', t.x, t.y);
   near.hp = 1000; near.max_hp = 1000;
   DS.playerWait(G);
@@ -226,11 +234,12 @@ test('시야 밖에 있는 적은 경계하지 않고, 놓치면 경계를 푼�
   assert.strictEqual(near.alert, false);
 });
 
-test('원거리 몬스터는 떨어진 곳에서 쏜다', () => {
+test('원거리 몬스터는 떨어진 곳에서 쏜다(일단 눈치챈 뒤)', () => {
   const G = inDungeon(7);
   const p = G.char.player;
   const t = openTileAt(G, 3, 5);
   const m = place(G, 'goblin_archer', t.x, t.y);
+  m.alert = true; m.alert_turns = 6;
   const hp0 = p.hp;
   let shot = false;
   for (let i = 0; i < 30 && !shot; i++) { DS.playerWait(G); shot = p.hp < hp0 - 1 && DS.manhattan(m.pos, p.pos) > 1; }
@@ -239,16 +248,14 @@ test('원거리 몬스터는 떨어진 곳에서 쏜다', () => {
 
 test('여러 마리가 동시에 달려든다', () => {
   const G = inDungeon(9);
-  const f = floor();
+  const f = floor(), c = G.dungeon.pos;
   const spots = [];
-  for (let r = 2; r <= 4 && spots.length < 3; r++) for (const [dx, dy] of [[r, 0], [-r, 0], [0, r], [0, -r], [r, 1], [-r, 1]]) {
-    const x = G.dungeon.pos.x + dx, y = G.dungeon.pos.y + dy;
-    if (DS.isOpen(f, x, y) && DS.hasLos(f, G.dungeon.pos, { x, y }) && !spots.some((s) => s.x === x && s.y === y)) spots.push({ x, y });
-    if (spots.length === 3) break;
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) {
+    if (spots.length < 3 && DS.isOpen(f, c.x + dx, c.y + dy)) spots.push({ x: c.x + dx, y: c.y + dy });
   }
   assert.ok(spots.length >= 2, 'spots');
   for (const s of spots) place(G, 'gnome', s.x, s.y);
-  for (let i = 0; i < 4; i++) DS.playerWait(G);
+  DS.playerWait(G);
   assert.ok(DS.alertMonsters(G).length >= 2, 'multiple alerted');
 });
 

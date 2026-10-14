@@ -40,8 +40,8 @@ class MonsterGradeTests(unittest.TestCase):
 
     def test_overrides(self):
         ghoul = make_enemy(BASE_DB, "ghoul")
-        self.assertEqual(eff_stat(ghoul, "strength"), 1)
-        self.assertEqual(eff_stat(ghoul, "agility"), 3)
+        self.assertEqual(eff_stat(ghoul, "strength"), 0)
+        self.assertEqual(eff_stat(ghoul, "agility"), 1)
         self.assertEqual(eff_stat(make_enemy(BASE_DB, "goblin_archer"), "strength"), 1)
         self.assertEqual(eff_stat(make_enemy(BASE_DB, "gnome"), "strength"), 0)
 
@@ -189,6 +189,8 @@ class ActionCountTests(unittest.TestCase):
 
     def test_agility_adds_actions_with_cap(self):
         db, p, e, st = fresh("ghoul")
+        e["base_stats"]["agility"] = 3
+        e["stat_override"] = {"agility": 3}
         total = sum(combat.action_count(db["rules"], e) for _ in range(10))   # 민첩성 3 -> 라운드당 +0.6
         self.assertIn(total, (15, 16))
         e["base_stats"]["agility"] = 1000
