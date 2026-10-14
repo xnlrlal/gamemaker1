@@ -11,6 +11,7 @@ GameMaker(GML)로 만드는 영구사망 서바이벌 RPG. 기획서는 [`docs/d
 | `tests/` | 전투 규칙 단위 테스트 (`python3 -m unittest discover -s tests -t .`) |
 | `web/` | 브라우저 플레이 프로토타입(모바일 세로 화면). `web/src` 가 로직·UI, `web/build.py` 가 한 파일로 묶는다 |
 | `docs/implementation_notes.md` | 구현하며 정한 임시 규칙, 시뮬레이션 결과, 다음 할 일 |
+| `CLAUDE.md` | 새 세션 인계: 현재 상태, 다음 할 일, 명령어, 작업 규칙 |
 | `docs/WORKFLOW.md` | 브랜치·커밋·병합 규칙(앞으로의 작업 방식) |
 | `CHANGELOG.md` | 지금까지 작업 요약 |
 

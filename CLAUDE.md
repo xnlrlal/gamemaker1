@@ -1,0 +1,62 @@
+# 던전 앤 스톤 (gamemaker1) — 작업 인계
+
+새 세션은 이 파일부터 읽고 바로 이어서 작업한다. 사용자는 한국어로 대화하고, 응답도 한국어로 한다.
+
+## 프로젝트
+영구사망 생존 서바이벌 RPG(스톤샤드 모티프). 최종 목표는 **GameMaker(GML) 모바일 앱**이고, 지금은 규칙을 손에 익히기 위한 **브라우저 프로토타입**(휴대폰 세로 화면)과 **Python 참조 구현**이 있다. GameMaker 프로젝트(.yyp)는 아직 없다(이 환경에서는 GameMaker 를 실행할 수 없음).
+
+- 기획서 최신본: `docs/design_notes_v7.md` (v6 은 `design_notes_v6.md` 로 보존). v6→v7 변경과 **열린 질문 7개**: `docs/design_v7_changes.md`
+- 구현 노트(임시 규칙·검증 결과·구조): `docs/implementation_notes.md` · 전체 흐름: `CHANGELOG.md`
+- 플레이 링크(비공개 Artifact): https://claude.ai/artifact/EESFTEzJU4qDhF1V7mYFCt — 갱신은 `Artifact` 도구로 같은 `file_path`(`web/dist/dungeon-stone.html`)를 다시 게시. 새 세션에서는 `url` 을 함께 넘기고 먼저 `read` 한다.
+
+## 현재 상태 (2026-10-14)
+- 기본 브랜치 `main`. 지금까지 작업은 모두 반영됨.
+- **프로토타입 한 판 루프 동작**: 바바리안 성인식 → 마을 → 판단창 → 1층 수정동굴 → 지도 위 턴제 전투 → 강제 귀환/사망 → 환전, 저장·이어하기(전투 도중 포함).
+- **전투 방식(확정)**: 맵 이동도 턴제, 한 칸 = 한 턴, 이동할 때마다 모든 재사용 대기 −1. 별도 전투 화면 없음. 적은 지도에 보이고 여러 마리가 동시에 싸움. 이동하면 그 턴은 끝(플레이어·몬스터 동일). 사거리 1 = 상하좌우 인접, 무기가 사거리를 정함(창 2·활 5), 벽이 시선을 막음.
+- **몬스터 배치(확정)**: 진영 자리만 고정 시드(1층 12곳, 11칸 이상 간격). 플레이어가 9칸 안으로 가면 시야 밖에서 그날 크기만큼 등장 — 1일차 1마리, 2일차 2마리, 3일차 3마리. 확률 조우 없음.
+- **아직 없음**: 정수, 생존 수치·밤친구, 상점·회중시계, 인간형 NPC 조우, 암흑지역·고블린 덫, 2층, 동료, 자동전투(재설계 필요 — 4-10).
+- 수치는 전부 **임시값**. 지도 위 전투의 밸런스는 아직 검증하지 않았다(1대1 기준 수치).
+
+## 다음에 할 일 (우선순위 제안)
+1. `docs/design_v7_changes.md` 의 열린 질문 확정(자동전투 방식, 적 타겟팅, 무리 크기 시점, 선공 규칙, 시계 방식, 인간형 NPC, 2층) → v7 본문 갱신.
+2. 플레이 피드백 반영(사용자가 휴대폰에서 직접 플레이하며 불편한 점을 알려 줌 — 지금까지: 길게 누르면 글자 선택, 후퇴 중 피격, 몬스터 밀집 → 모두 수정함).
+3. 정수 시스템 / 생존 수치(포만감·수분·피로도)와 밤친구 / 지도 위 전투 밸런스 재조정.
+4. GML 이식(미착수): 규칙의 기준은 `web/src/*.js` 와 `data/db.json`.
+
+## 코드 구조
+| 경로 | 역할 |
+|---|---|
+| `data/db.json` | **모든 고정값**(규칙·스킬·종족·장비·몬스터 18종·던전·경제·표시 이름). 코드에 숫자를 하드코딩하지 않는다. 수정할 때 JSON 문법(마지막 쉼표)을 꼭 확인 |
+| `sim/` | Python 참조 구현: **1대1 라운드 전투 코어**(판정 규칙의 기준)와 승률 시뮬레이터(`python3 -m sim.simulate --matrix bestiary` 등). 지도 위 전투(위치·접근)는 반영하지 않음 |
+| `web/src/` | 브라우저 프로토타입. 전역 `DS` 네임스페이스. `rng`(시드 난수) → `entities` → `combat`(판정 규칙, sim 과 동일) → `world`(지형·보상) → `tactics`(지도 위 턴제·적 AI·진영) → `game`(상태·저장·시계) → `icons` → `ui`(DOM·캔버스) |
+| `web/build.py` | 위 파일을 한 HTML 로 묶음 → `web/dist/play.html`(완전한 문서), `web/dist/dungeon-stone.html`(Artifact 조각). `web/dist/` 는 git 에 없음 |
+| `tests/` · `web/tests/` | Python 단위 테스트 · Node 테스트(`game.test.js`) · Python↔JS 승률 비교(`parity.js`) · 브라우저 E2E(`e2e.js`) |
+
+- 게임 상태 `G` 는 순수 JSON(저장 키 `dungeon_stone_save_v2`, 구 버전은 무시). 규칙 코드는 DOM 을 모른다.
+- 판정 함수(명중·치명·피해·상태이상·부위 손상)는 `combat.js` 하나를 지도 위 전투(`tactics.js`)가 재사용한다. 판정 규칙을 바꾸면 **Python `sim/` 과 JS 를 둘 다** 바꾸고 `parity.js` 로 확인한다.
+- UI 는 스톤샤드 스크린샷을 참고한 구성이지만 **이미지·아이콘·글꼴은 직접 제작**(외부 게임 자산 사용 금지). 출시 전 권리·유사성 점검(기획서 부록 B-⑧).
+
+## 명령어
+```
+python3 -m unittest discover -s tests -t .          # Python 테스트(50)
+node --test web/tests/game.test.js                  # Node 테스트(31)
+node web/tests/parity.js                            # Python↔JS 승률 일치(10개 조합)
+python3 web/build.py && node web/tests/e2e.js /tmp/shots   # 빌드 + 크로미움 E2E(UI 를 건드렸을 때, 스크린샷은 지정 폴더에 저장)
+python3 -m sim.simulate --enemy ghoul -n 2000       # 승률 시뮬레이션, --matrix races|weapons|floor2|bestiary, --log
+```
+- E2E 는 playwright(전역 설치)와 `/opt/pw-browsers` 의 크로미움을 쓴다. 다운로드·`playwright install` 금지.
+- 스크린샷으로 UI 를 확인할 때는 `Read` 로 png 를 연다(휴대폰 390×844 기준).
+
+## 작업 규칙 (`docs/WORKFLOW.md` 요약)
+- **`main` 에 직접 커밋하지 않는다.** `feat/…`, `fix/…`, `docs/…` 브랜치를 따서 작업, 커밋 제목은 `feat:`·`fix:`·`docs:`·`test:`·`refactor:`·`chore:` 접두어 + 명령형 영어 한 줄, 한 커밋 = 한 논리적 변경(코드·테스트·문서 함께).
+- 푸시 전에 위 테스트를 모두 통과시킨다. 규칙·수치가 바뀌면 `docs/implementation_notes.md`, 병합할 때마다 `CHANGELOG.md` 갱신.
+- **PR 은 사용자가 요청할 때만** 만들고, 요청하면 **스쿼시 병합**까지 한다. PR 본문은 목적 / 변경 / 검증 / 남은 것 순서.
+- 큰 방향(전투 방식 등)은 구현 전에 사용자에게 선택지를 물어 확정한다. 확정된 결정은 번복하지 않는다.
+- 수치를 바꿀 때는 이유와 측정 결과(시뮬레이션 승률 등)를 근거로 남긴다. 서사 근거 없이 몬스터 능력치를 올리지 않는다(기획서 6-1).
+
+## 환경 메모 (클라우드 세션)
+- GitHub 는 `mcp__github__*` 도구로만 다룬다(`gh` 없음). 이 저장소: `xnlrlal/gamemaker1`, 공개 저장소.
+- 이 환경의 프록시가 **원격 브랜치 삭제(`git push --delete`)를 막는다**(연결 오류). 병합된 브랜치는 GitHub 의 "Delete branch" 버튼으로 사용자가 지운다.
+- `m.blog.naver.com` 등 일부 호스트는 네트워크 정책으로 막혀 있다. 참고 이미지는 사용자가 채팅에 직접 올린다.
+- 웹 검색(`WebSearch`)·`WebFetch` 는 도구를 먼저 불러와야 쓸 수 있고, 일부 사이트는 접속되지 않는다.
+- 임시 파일은 스크래치패드에 둔다. 사용자는 앱에서 세션을 보므로 보여 줄 파일은 작업 폴더 안에 둔다.
