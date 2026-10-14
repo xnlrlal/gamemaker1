@@ -1,0 +1,29 @@
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  handoff:
+    # PR 이 코드·데이터·문서를 바꿨다면 CLAUDE.md(인계 문서)도 갱신돼 있어야 한다.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: python3 scripts/check_handoff.py --base origin/main
+
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: python3 -m unittest discover -s tests -t .
+      - run: node --test web/tests/game.test.js
+      - run: node web/tests/parity.js

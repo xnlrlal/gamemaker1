@@ -1,0 +1,27 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && git config core.hooksPath .githooks && chmod +x .githooks/* scripts/*.py 2>/dev/null; true",
+            "statusMessage": "git 훅 설정 중"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && python3 scripts/check_handoff.py --hook",
+            "timeout": 30,
+            "statusMessage": "인계 문서(CLAUDE.md) 갱신 여부 확인 중"
+          }
+        ]
+      }
+    ]
+  }
+}

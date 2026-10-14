@@ -18,10 +18,12 @@
 | 7. 후퇴 수정 | 이동하면 턴이 끝나도록 통일 → 물러서는 동안 근접 몬스터에게 맞지 않음(구울 2.7회 → 0회) | 9c6c4f6 |
 | 8. 몬스터 배치 수정 | 진영 자리만 고정(11칸 이상 간격), 가까이 가면 **1일차 1마리 / 2일차 2마리 / 3일차 3마리**가 나타남 | a1ffe01 |
 | 9. 기획서 v7 | 확정된 변경(지도 위 턴제 전투, 이동하면 턴 종료, 날짜별 무리 등)을 `docs/design_notes_v7.md` 로 정리, v6→v7 변경 요약과 열린 질문 7개(`docs/design_v7_changes.md`) | docs/design-v7 |
+| 10. 세션 인계 | 새 세션이 바로 이어서 작업하도록 `CLAUDE.md`(현재 상태·다음 할 일·명령어·작업 규칙·환경 메모) 추가 | docs/claude-md |
+| 11. 인계 문서 강제 | `scripts/check_handoff.py`(작업했는데 CLAUDE.md 를 안 고치면 실패) + Stop 훅 + pre-push 훅 + CI(`handoff`·`tests`), 검사 로직 단위 테스트 11개 | docs/claude-md |
 
 ## 구조
 - `data/db.json` 모든 고정값 · `sim/` Python 참조 구현 · `web/src/` JS 로직·UI · `web/build.py` 한 파일 빌드 · `tests/`, `web/tests/` 테스트
-- 검증: Python 50개, Node 31개, Python↔JS 승률 일치 10개 조합, 크로미움 E2E(모바일 화면)
+- 검증: Python 61개, Node 31개, Python↔JS 승률 일치 10개 조합, 크로미움 E2E(모바일 화면)
 
 ## 알려진 한계 / 다음 할 일
 - 수치는 모두 임시값이다. 지도 위 전투(접근 거리·동시 전투)에서는 1대1 기준 밸런스를 다시 맞춰야 한다.
