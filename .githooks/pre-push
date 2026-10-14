@@ -1,0 +1,10 @@
+#!/bin/sh
+# 푸시 전에 CLAUDE.md(인계 문서)가 작업과 함께 갱신됐는지 확인한다. 건너뛰기: SKIP_HANDOFF=1 git push
+[ "$SKIP_HANDOFF" = "1" ] && exit 0
+zero=0000000000000000000000000000000000000000
+pushing=0
+while read local_ref local_sha remote_ref remote_sha; do
+  [ "$local_sha" != "$zero" ] && pushing=1   # 브랜치 삭제 푸시는 검사하지 않는다
+done
+[ "$pushing" = "0" ] && exit 0
+python3 "$(git rev-parse --show-toplevel)/scripts/check_handoff.py" || exit 1

@@ -16,8 +16,10 @@
 - **몬스터 배치(확정)**: 진영 자리만 고정 시드(1층 12곳, 11칸 이상 간격). 플레이어가 9칸 안으로 가면 시야 밖에서 그날 크기만큼 등장 — 1일차 1마리, 2일차 2마리, 3일차 3마리. 확률 조우 없음.
 - **아직 없음**: 정수, 생존 수치·밤친구, 상점·회중시계, 인간형 NPC 조우, 암흑지역·고블린 덫, 2층, 동료, 자동전투(재설계 필요 — 4-10).
 - 수치는 전부 **임시값**. 지도 위 전투의 밸런스는 아직 검증하지 않았다(1대1 기준 수치).
+- **인계 문서 자동 점검 도입**(아래 '자동 점검'): 작업 후 이 파일을 갱신하지 않으면 Stop 훅·pre-push 훅·CI 가 막는다.
 
 ## 다음에 할 일 (우선순위 제안)
+0. (사용자 조치) GitHub 저장소 Settings → Branches → `main` 보호 규칙에서 CI 의 `handoff`·`tests` 를 필수 체크로 지정하면 병합 단계에서도 강제된다. 병합된 브랜치(`docs/design-v7`)는 GitHub 에서 직접 삭제.
 1. `docs/design_v7_changes.md` 의 열린 질문 확정(자동전투 방식, 적 타겟팅, 무리 크기 시점, 선공 규칙, 시계 방식, 인간형 NPC, 2층) → v7 본문 갱신.
 2. 플레이 피드백 반영(사용자가 휴대폰에서 직접 플레이하며 불편한 점을 알려 줌 — 지금까지: 길게 누르면 글자 선택, 후퇴 중 피격, 몬스터 밀집 → 모두 수정함).
 3. 정수 시스템 / 생존 수치(포만감·수분·피로도)와 밤친구 / 지도 위 전투 밸런스 재조정.
@@ -38,14 +40,22 @@
 
 ## 명령어
 ```
-python3 -m unittest discover -s tests -t .          # Python 테스트(50)
+python3 -m unittest discover -s tests -t .          # Python 테스트(61)
 node --test web/tests/game.test.js                  # Node 테스트(31)
 node web/tests/parity.js                            # Python↔JS 승률 일치(10개 조합)
 python3 web/build.py && node web/tests/e2e.js /tmp/shots   # 빌드 + 크로미움 E2E(UI 를 건드렸을 때, 스크린샷은 지정 폴더에 저장)
 python3 -m sim.simulate --enemy ghoul -n 2000       # 승률 시뮬레이션, --matrix races|weapons|floor2|bestiary, --log
+python3 scripts/check_handoff.py                    # 이 파일(CLAUDE.md)이 작업과 함께 갱신됐는지 점검(아래 '자동 점검')
 ```
 - E2E 는 playwright(전역 설치)와 `/opt/pw-browsers` 의 크로미움을 쓴다. 다운로드·`playwright install` 금지.
 - 스크린샷으로 UI 를 확인할 때는 `Read` 로 png 를 연다(휴대폰 390×844 기준).
+
+## 자동 점검 (이 파일을 안 고치면 막힌다)
+`scripts/check_handoff.py` 가 다음을 검사한다: ① `CLAUDE.md`·`CHANGELOG.md`·`README.md` 외 파일을 바꿨다면 `CLAUDE.md` 도 같이 바뀌었는가 ② `## 현재 상태 (YYYY-MM-DD)` 와 번호가 있는 `## 다음에 할 일` 이 있는가 ③ 날짜가 이 브랜치의 최근 커밋보다 이르지 않은가(병합 커밋 제외, 미래도 불가).
+- **Stop 훅**(`.claude/settings.json`): 세션이 끝나려 할 때 검사하고, 실패하면 이유를 되돌려 보내 갱신하게 한다(한 번만 되돌림 — 무한 반복 방지).
+- **pre-push 훅**(`.githooks/pre-push`): 푸시 전에 같은 검사. SessionStart 훅이 `core.hooksPath` 를 설정한다(새 클론에서는 `git config core.hooksPath .githooks`).
+- **CI**(`.github/workflows/ci.yml`): PR 에서 같은 검사 + 테스트. 의도적으로 건너뛸 때만 `SKIP_HANDOFF=1`.
+- 통과하려면: "현재 상태"를 사실대로 고치고(날짜 포함), "다음에 할 일"에서 끝낸 것을 지우고 새 할 일을 번호로 적은 뒤 같은 브랜치에 커밋한다.
 
 ## 작업 규칙 (`docs/WORKFLOW.md` 요약)
 - **`main` 에 직접 커밋하지 않는다.** `feat/…`, `fix/…`, `docs/…` 브랜치를 따서 작업, 커밋 제목은 `feat:`·`fix:`·`docs:`·`test:`·`refactor:`·`chore:` 접두어 + 명령형 영어 한 줄, 한 커밋 = 한 논리적 변경(코드·테스트·문서 함께).
