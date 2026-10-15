@@ -464,3 +464,15 @@ test('한 칸 떨어진 적이 다가오는 턴에는 공격하지 못한다', (
   assert.strictEqual(DS.manhattan(m.pos, p.pos), 1);
   assert.ok(p.hp >= hp0 - 0.01, 'moving ends the turn');
 });
+
+test('부위 손상은 전투가 끝나도 남고, 마을로 돌아오면 회복된다', () => {
+  const G = inDungeon(7);
+  const p = G.char.player;
+  p.damaged_parts = ['left_arm']; p.part_penalty = { accuracy: -3 };
+  DS.playerWait(G); // 경계 중인 적이 없는 상태
+  assert.deepStrictEqual(p.damaged_parts, ['left_arm']);
+  assert.strictEqual(p.part_penalty.accuracy, -3);
+  DS.forcedReturn(G);
+  assert.deepStrictEqual(p.damaged_parts, []);
+  assert.deepStrictEqual(p.part_penalty, {});
+});

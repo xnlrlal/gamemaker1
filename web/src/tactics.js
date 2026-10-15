@@ -264,9 +264,8 @@ DS.worldTick = function (G) {
   for (const c of [p, ...d.monsters.filter((m) => m.alive)]) unitEndTurn(G, ts, c);
   d.turn += 1;
   reapKills(G);
-  if (!DS.alertMonsters(G).length) { // 전투가 끝났다: 손상 부위는 전투가 끝날 때까지만 유지(4-8)
-    p.damaged_parts = []; p.part_penalty = {}; p.vs_bonus = {};
-  }
+  // 전투가 끝나면 숙련 보너스(상대 한정)만 푼다. 손상 부위는 마을로 돌아가 회복할 때까지 유지된다(2026-10-14 변경, 4-8).
+  if (!DS.alertMonsters(G).length) p.vs_bonus = {};
   flushLog(G, ts);
   if (!p.alive) DS.die(G, ts.instakill);
 };
