@@ -476,3 +476,17 @@ test('부위 손상은 전투가 끝나도 남고, 마을로 돌아오면 회복
   assert.deepStrictEqual(p.damaged_parts, []);
   assert.deepStrictEqual(p.part_penalty, {});
 });
+
+test('기본 공격(적 탭)은 쓸 수 있는 가장 강한 공격 스킬을 쓰고, 영혼력이 모자라면 싼 스킬로 내려간다', () => {
+  const G = inDungeon(7);
+  const p = G.char.player;
+  const t = adjacentOpen(G);
+  const m = place(G, 'gnome', t.x, t.y);
+  m.hp = 1000; m.max_hp = 1000;
+  DS.playerAttackDefault(G, m.uid);
+  assert.ok(p.cooldowns.smash > 0, '강타(가장 강함) 사용');
+  p.spirit = 3; p.cooldowns = {};
+  p.skills.forEach((s) => { if (s !== 'slash') p.cooldowns[s] = 5; });
+  const r = DS.playerAttackDefault(G, m.uid);
+  assert.ok(r.ok, '영혼력 3 이면 베기로 내려간다');
+});

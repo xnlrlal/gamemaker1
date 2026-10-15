@@ -348,11 +348,17 @@ DS.playerSkill = function (G, sid, uid) {
   return { ok: true };
 };
 
-/** 기본 공격: 지금 쓸 수 있는 가장 약한(싼) 공격 스킬 — 우선 베기. */
+/** 기본 공격: 지금 쓸 수 있는 공격 스킬 중 위력(근력 반영)이 가장 큰 것. 시뮬레이터의 기본 정책(highest_value)과 같다.
+ * 영혼력이 바닥나면 자연스럽게 싼 베기로 내려간다. 스킬을 직접 고르고 싶으면 핫바를 쓴다. */
 DS.playerAttackDefault = function (G, uid) {
   const p = G.char.player;
   const target = G.dungeon.monsters.find((m) => m.uid === uid);
-  const order = ['slash'].concat(p.skills.filter((s) => s !== 'slash' && DS.db.skills[s].kind === 'attack'));
-  for (const sid of order) if (p.skills.includes(sid) && DS.canUseSkill(G, sid, target).ok) return DS.playerSkill(G, sid, uid);
+  let best = null, bv = -1;
+  for (const sid of p.skills) {
+    if (DS.db.skills[sid].kind !== 'attack' || !DS.canUseSkill(G, sid, target).ok) continue;
+    const v = DS.skillValue(null, p, sid);
+    if (v > bv) { best = sid; bv = v; }
+  }
+  if (best) return DS.playerSkill(G, best, uid);
   return DS.canUseSkill(G, 'slash', target);
 };
