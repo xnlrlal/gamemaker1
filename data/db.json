@@ -39,6 +39,7 @@
       "activate_radius": 9,
       "group_by_day": [1, 2, 3],
       "sight_radius": 6,
+      "aggro_radius": 1,
       "lose_sight_turns": 6
     }
   },
@@ -159,8 +160,8 @@
   "monsters": {
     "gnome":            { "name_ko": "노움",         "grade": 9, "floor": 1, "zone": "north", "ranged": false },
     "blade_wolf":       { "name_ko": "칼날늑대",     "grade": 9, "floor": 1, "zone": "east",  "ranged": false, "skills": ["bite", "slash"] },
-    "goblin":           { "name_ko": "고블린",       "grade": 9, "floor": 1, "zone": "south", "ranged": false },
-    "ghoul":            { "name_ko": "구울",         "grade": 9, "floor": 1, "zone": "west",  "ranged": false, "stat_override": { "strength": 1, "agility": 3 }, "skills": ["rend", "slash"] },
+    "goblin":           { "name_ko": "고블린",       "grade": 9, "floor": 1, "zone": "south", "ranged": false, "stat_override": { "strength": -8, "accuracy": -10 } },
+    "ghoul":            { "name_ko": "구울",         "grade": 9, "floor": 1, "zone": "west",  "ranged": false, "stat_override": { "strength": 0, "agility": 1 }, "skills": ["rend", "slash"] },
 
     "goblin_swordsman": { "name_ko": "고블린 검사",   "grade": 9, "floor": 2, "zone": "north", "ranged": false, "stat_override": { "strength": 1 }, "skills": ["pierce", "slash"] },
     "goblin_archer":    { "name_ko": "고블린 궁수",   "grade": 9, "floor": 2, "zone": "north", "ranged": true,  "stat_override": { "strength": 1 }, "skills": ["aimed_shot", "shoot"] },

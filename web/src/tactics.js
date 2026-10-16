@@ -189,7 +189,10 @@ function monsterChoose(G, m, p) {
 function monsterTurn(G, ts, m) {
   const floor = DS.getFloor(), cfg = DS.db.dungeon.floor1, p = G.char.player;
   const dist = Math.hypot(m.pos.x - p.pos.x, m.pos.y - p.pos.y);
-  const sees = dist <= cfg.sight_radius && DS.hasLos(floor, m.pos, p.pos);
+  // 처음 눈치채는 건 둘러싼 8칸(aggro_radius) 안에 들어왔을 때뿐 — 멀리서 보이는 것만으로는 선공하지 않는다.
+  // 한 번 눈치챈 뒤에는 시야 반경 안에서 시선이 닿는 동안 계속 쫓는다.
+  const near = Math.max(Math.abs(m.pos.x - p.pos.x), Math.abs(m.pos.y - p.pos.y)) <= cfg.aggro_radius;
+  const sees = m.alert ? dist <= cfg.sight_radius && DS.hasLos(floor, m.pos, p.pos) : near;
   if (sees) {
     if (!m.alert) { ts.log.push('T' + ts.round + ' ' + m.name + '이(가) 당신을 발견했다!'); m.alert = true; }
     m.alert_turns = cfg.lose_sight_turns;
@@ -261,9 +264,8 @@ DS.worldTick = function (G) {
   for (const c of [p, ...d.monsters.filter((m) => m.alive)]) unitEndTurn(G, ts, c);
   d.turn += 1;
   reapKills(G);
-  if (!DS.alertMonsters(G).length) { // 전투가 끝났다: 손상 부위는 전투가 끝날 때까지만 유지(4-8)
-    p.damaged_parts = []; p.part_penalty = {}; p.vs_bonus = {};
-  }
+  // 전투가 끝나면 숙련 보너스(상대 한정)만 푼다. 손상 부위는 마을로 돌아가 회복할 때까지 유지된다(2026-10-14 변경, 4-8).
+  if (!DS.alertMonsters(G).length) p.vs_bonus = {};
   flushLog(G, ts);
   if (!p.alive) DS.die(G, ts.instakill);
 };
@@ -339,17 +341,24 @@ DS.playerSkill = function (G, sid, uid) {
   if (!chk.ok) return chk;
   const ts = tstate(G);
   playerTurnStart(G);
+  if (target) target.alert = true; // 공격을 받으면 멀리서도 반격하러 온다
   // 방어는 자기 턴 시작에 사라지므로 사용 직후 새로 쌓는다
   useSkill(G, ts, G.char.player, sid, target);
   DS.worldTick(G);
   return { ok: true };
 };
 
-/** 기본 공격: 지금 쓸 수 있는 가장 약한(싼) 공격 스킬 — 우선 베기. */
+/** 기본 공격: 지금 쓸 수 있는 공격 스킬 중 위력(근력 반영)이 가장 큰 것. 시뮬레이터의 기본 정책(highest_value)과 같다.
+ * 영혼력이 바닥나면 자연스럽게 싼 베기로 내려간다. 스킬을 직접 고르고 싶으면 핫바를 쓴다. */
 DS.playerAttackDefault = function (G, uid) {
   const p = G.char.player;
   const target = G.dungeon.monsters.find((m) => m.uid === uid);
-  const order = ['slash'].concat(p.skills.filter((s) => s !== 'slash' && DS.db.skills[s].kind === 'attack'));
-  for (const sid of order) if (p.skills.includes(sid) && DS.canUseSkill(G, sid, target).ok) return DS.playerSkill(G, sid, uid);
+  let best = null, bv = -1;
+  for (const sid of p.skills) {
+    if (DS.db.skills[sid].kind !== 'attack' || !DS.canUseSkill(G, sid, target).ok) continue;
+    const v = DS.skillValue(null, p, sid);
+    if (v > bv) { best = sid; bv = v; }
+  }
+  if (best) return DS.playerSkill(G, best, uid);
   return DS.canUseSkill(G, 'slash', target);
 };

@@ -20,13 +20,15 @@
 | 9. 기획서 v7 | 확정된 변경(지도 위 턴제 전투, 이동하면 턴 종료, 날짜별 무리 등)을 `docs/design_notes_v7.md` 로 정리, v6→v7 변경 요약과 열린 질문 7개(`docs/design_v7_changes.md`) | docs/design-v7 |
 | 10. 세션 인계 | 새 세션이 바로 이어서 작업하도록 `CLAUDE.md`(현재 상태·다음 할 일·명령어·작업 규칙·환경 메모) 추가 | docs/claude-md |
 | 11. 인계 문서 강제 | `scripts/check_handoff.py`(작업했는데 CLAUDE.md 를 안 고치면 실패) + Stop 훅 + pre-push 훅 + CI(`handoff`·`tests`), 검사 로직 단위 테스트 11개 | docs/claude-md |
+| 12. 플레이 피드백 밸런스 | 구울 하향(근력 0·민첩성 1, 1대1 83→93%), 선공 범위 둘러싼 8칸(멀리서 보면 돌아갈 수 있음), 부위 손상을 마을 귀환까지 유지, 적 탭 기본 공격을 가장 강한 스킬로(구울 1마리 승률 35~64→91~94%) | claude/annyeong-k6unuy |
+| 13. 고블린 무리 | 고블린 근력 −8·명중률 −10 → 3~4마리 무리도 6종 무기 모두 100%. 지도 위 무리 전투 측정 스크립트 `web/tests/groupsim.js` 추가 | claude/annyeong-k6unuy |
 
 ## 구조
 - `data/db.json` 모든 고정값 · `sim/` Python 참조 구현 · `web/src/` JS 로직·UI · `web/build.py` 한 파일 빌드 · `tests/`, `web/tests/` 테스트
-- 검증: Python 61개, Node 31개, Python↔JS 승률 일치 10개 조합, 크로미움 E2E(모바일 화면)
+- 검증: Python 61개, Node 34개, Python↔JS 승률 일치 10개 조합, 크로미움 E2E(모바일 화면)
 
 ## 알려진 한계 / 다음 할 일
-- 수치는 모두 임시값이다. 지도 위 전투(접근 거리·동시 전투)에서는 1대1 기준 밸런스를 다시 맞춰야 한다.
+- 수치는 모두 임시값이다. 고블린 외 몬스터(구울·노움·칼날늑대)는 2마리 이상 동시 전투에서 승률이 0% 근처라 밸런스를 다시 맞춰야 한다(`groupsim.js`).
 - 아직 없음: 정수, 생존 수치·밤친구, 상점·회중시계, 인간형 NPC, 암흑지역·덫, 2층, 동료, 자동전투(재설계 필요).
 - 기획서는 v7 수정안(`docs/design_notes_v7.md`)을 만들었다. 자동전투 재설계 등 열린 질문 7개는 `docs/design_v7_changes.md` 에서 확정이 필요하다.
 - GameMaker(GML) 이식은 미착수. 이 JS 구현과 `db.json` 이 기준이 된다.
