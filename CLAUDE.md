@@ -5,11 +5,12 @@
 ## 프로젝트
 영구사망 생존 서바이벌 RPG(스톤샤드 모티프). 최종 목표는 **GameMaker(GML) 모바일 앱**이고, 지금은 규칙을 손에 익히기 위한 **브라우저 프로토타입**(휴대폰 세로 화면)과 **Python 참조 구현**이 있다. GameMaker 프로젝트(.yyp)는 아직 없다(이 환경에서는 GameMaker 를 실행할 수 없음).
 
-- 기획서 최신본: `docs/design_notes_v7.md` (v6 은 `design_notes_v6.md` 로 보존). v6→v7 변경과 **열린 질문 7개**: `docs/design_v7_changes.md`
+- 기획서 최신본: `docs/design/`(요소별 16개 문서 + `README.md` 목차, 2026-10-16 에 `design_notes_v7.md` 를 분리 — 원본은 안내만 남김. 절 번호 유지). v6 은 `design_notes_v6.md` 로 보존). v6→v7 변경과 **열린 질문 7개**: `docs/design_v7_changes.md`
 - 구현 노트(임시 규칙·검증 결과·구조): `docs/implementation_notes.md` · 전체 흐름: `CHANGELOG.md`
 - 플레이 링크(비공개 Artifact): https://claude.ai/artifact/EESFTEzJU4qDhF1V7mYFCt — 갱신은 `Artifact` 도구로 같은 `file_path`(`web/dist/dungeon-stone.html`)를 다시 게시. 새 세션에서는 `url` 을 함께 넘기고 먼저 `read` 한다.
 
 ## 현재 상태 (2026-10-16)
+- **기획서 분리(2026-10-16)**: 하나였던 `design_notes_v7.md` 를 `docs/design/` 의 요소별 문서(전투·능력치·몬스터와 정수·미궁 등)로 나눔. 내용 변경 없음(원문 줄 대조로 확인). 기획서를 고칠 때는 해당 요소 문서를 직접 고친다.
 - 기본 브랜치 `main`. 지금까지 작업은 모두 반영됨.
 - **프로토타입 한 판 루프 동작**: 바바리안 성인식 → 마을 → 판단창 → 1층 수정동굴 → 지도 위 턴제 전투 → 강제 귀환/사망 → 환전, 저장·이어하기(전투 도중 포함).
 - **전투 방식(확정)**: 맵 이동도 턴제, 한 칸 = 한 턴, 이동할 때마다 모든 재사용 대기 −1. 별도 전투 화면 없음. 적은 지도에 보이고 여러 마리가 동시에 싸움. 이동하면 그 턴은 끝(플레이어·몬스터 동일). 사거리 1 = 상하좌우 인접, 무기가 사거리를 정함(창 2·활 5), 벽이 시선을 막음.
