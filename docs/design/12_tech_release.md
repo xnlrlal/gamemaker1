@@ -1,6 +1,6 @@
 # 《던전 앤 스톤》 기획서 — 스킬 확장·저장, 2D 구현과 출시
 
-> v7 기획서(`docs/design_notes_v7.md`)에서 나눈 문서. 내용은 원문 그대로이고 절 번호를 유지한다. 목차: [README](README.md)
+> 기획서 원본(`docs/design_notes.md`, v7)에서 나눈 문서. 내용은 원문 그대로이고 절 번호를 유지한다. 목차: [README](README.md)
 
 ## 15. 스킬 확장과 저장
 

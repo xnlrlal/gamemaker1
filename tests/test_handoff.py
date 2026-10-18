@@ -36,7 +36,7 @@ class EvaluateTests(unittest.TestCase):
         self.assertEqual(self.check(["docs/TODO.md"]), [])
 
     def test_docs_and_data_count_as_work(self):
-        self.assertTrue(self.check(["docs/design_notes_v7.md"]))
+        self.assertTrue(self.check(["docs/design_notes.md"]))
         self.assertTrue(self.check(["data/db.json"]))
         self.assertTrue(self.check(["tests/test_combat.py"]))
 

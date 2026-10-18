@@ -1,6 +1,6 @@
 # 《던전 앤 스톤》 기획서 — 단계별 착수 체크리스트
 
-> v7 기획서(`docs/design_notes_v7.md`)에서 나눈 문서. 내용은 원문 그대로이고 절 번호를 유지한다. 목차: [README](README.md)
+> 기획서 원본(`docs/design_notes.md`, v7)에서 나눈 문서. 내용은 원문 그대로이고 절 번호를 유지한다. 목차: [README](README.md)
 
 ## 부록 B. 단계별 착수 체크리스트
 

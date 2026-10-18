@@ -1,6 +1,6 @@
 # 《던전 앤 스톤》 기획서 — 파티·길드·클랜·레이드
 
-> v7 기획서(`docs/design_notes_v7.md`)에서 나눈 문서. 내용은 원문 그대로이고 절 번호를 유지한다. 목차: [README](README.md)
+> 기획서 원본(`docs/design_notes.md`, v7)에서 나눈 문서. 내용은 원문 그대로이고 절 번호를 유지한다. 목차: [README](README.md)
 
 ## 12. 파티
 
