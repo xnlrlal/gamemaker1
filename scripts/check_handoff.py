@@ -2,7 +2,7 @@
 """CLAUDE.md(세션 인계 문서)가 작업과 함께 갱신됐는지 검사한다.
 
 규칙
-  1. CLAUDE.md·CHANGELOG.md·README.md 외의 파일을 바꿨다면(커밋됐든 아직이든) CLAUDE.md 도 같이 바뀌어야 한다.
+  1. CLAUDE.md·CHANGELOG.md·README.md·docs/TODO.md 외의 파일을 바꿨다면(커밋됐든 아직이든) CLAUDE.md 와 docs/TODO.md 도 같이 바뀌어야 한다.
   2. CLAUDE.md 에는 "## 현재 상태 (YYYY-MM-DD)" 와 번호가 있는 "## 다음에 할 일" 이 있어야 한다.
   3. 현재 상태의 날짜는 이 브랜치의 가장 최근 커밋(병합 커밋 제외)보다 이르면 안 되고, 미래일 수도 없다.
 
@@ -19,7 +19,7 @@ import re
 import subprocess
 import sys
 
-EXEMPT = {"CLAUDE.md", "CHANGELOG.md", "README.md", "TEST.md", ".gitignore"}
+EXEMPT = {"CLAUDE.md", "CHANGELOG.md", "README.md", "TEST.md", ".gitignore", "docs/TODO.md"}
 DATE_RE = re.compile(r"^## 현재 상태 \((\d{4}-\d{2}-\d{2})\)", re.M)
 NEXT_RE = re.compile(r"^## 다음에 할 일[^\n]*\n(.*?)(?=^## |\Z)", re.M | re.S)
 ITEM_RE = re.compile(r"^\d+\. ", re.M)
@@ -32,6 +32,8 @@ def evaluate(changed, claude_text, newest_commit_date, today):
     if substantive and "CLAUDE.md" not in changed:
         shown = ", ".join(substantive[:5]) + (" 외 %d개" % (len(substantive) - 5) if len(substantive) > 5 else "")
         problems.append("작업 파일을 바꿨는데(%s) CLAUDE.md 가 갱신되지 않았다. '현재 상태'와 '다음에 할 일'을 고쳐라." % shown)
+    if substantive and "docs/TODO.md" not in changed:
+        problems.append("작업 파일을 바꿨는데 docs/TODO.md 가 갱신되지 않았다. 끝낸 일은 '최근 완료'로 옮기고 새 할 일·결정할 일을 추가해라.")
     if not substantive and "CLAUDE.md" not in changed:
         return problems  # 인계 문서와 무관한 변경(또는 변경 없음)
 

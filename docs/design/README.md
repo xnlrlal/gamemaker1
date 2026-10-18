@@ -1,6 +1,6 @@
 # 《던전 앤 스톤》 기획서 (v7, 요소별 분리)
 
-하나였던 `docs/design_notes_v7.md` 를 요소별 문서로 나눴다. 내용은 원문 그대로이고 절 번호(예: 4-10)는 유지한다. v6→v7 변경과 열린 질문은 [../design_v7_changes.md](../design_v7_changes.md).
+하나였던 `docs/design_notes.md` 를 요소별 문서로 나눴다. 내용은 원문 그대로이고 절 번호(예: 4-10)는 유지한다. v6→v7 변경과 열린 질문은 [../design_v7_changes.md](../design_changes.md).
 
 ## 문서 목록
 

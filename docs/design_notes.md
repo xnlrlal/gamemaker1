@@ -1,4 +1,4 @@
-# 《던전 앤 스톤》 게임 기획서 (v7)
+# 《던전 앤 스톤》 게임 기획서
 
 > **이 문서는 요소별 문서로 분리되었다.** 최신 기획서는 [`docs/design/`](design/README.md) 에 있다. 내용은 원문 그대로이고 절 번호(예: 4-10)도 같다.
 
@@ -21,4 +21,6 @@
 | 부록 A·C 결정 로그·개정 이력 | [design/91_decision_log.md](design/91_decision_log.md) |
 | 부록 B 착수 체크리스트 | [design/92_checklist.md](design/92_checklist.md) |
 
-이전 버전 v6 원문은 [`design_notes_v6.md`](design_notes_v6.md) 로 보존한다.
+v6 (이전 버전) 원문은 [`archive/design_notes_v6.md`](archive/design_notes_v6.md), v6→v7 변경과 열린 질문은 [`design_changes.md`](design_changes.md).
+
+파일 이름에는 버전을 붙이지 않는다. 버전이 필요한 보관본만 `archive/` 에 `_vN` 을 붙여 둔다.

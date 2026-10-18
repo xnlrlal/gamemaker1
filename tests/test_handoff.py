@@ -21,14 +21,22 @@ class EvaluateTests(unittest.TestCase):
 
     def test_code_change_without_claude_md_fails(self):
         p = self.check(["web/src/ui.js"])
-        self.assertEqual(len(p), 1)
+        self.assertEqual(len(p), 2)
         self.assertIn("web/src/ui.js", p[0])
 
-    def test_code_change_with_claude_md_passes(self):
-        self.assertEqual(self.check(["web/src/ui.js", "CLAUDE.md"]), [])
+    def test_code_change_with_claude_md_and_todo_passes(self):
+        self.assertEqual(self.check(["web/src/ui.js", "CLAUDE.md", "docs/TODO.md"]), [])
+
+    def test_code_change_without_todo_fails(self):
+        p = self.check(["web/src/ui.js", "CLAUDE.md"])
+        self.assertEqual(len(p), 1)
+        self.assertIn("TODO.md", p[0])
+
+    def test_todo_only_is_exempt(self):
+        self.assertEqual(self.check(["docs/TODO.md"]), [])
 
     def test_docs_and_data_count_as_work(self):
-        self.assertTrue(self.check(["docs/design_notes_v7.md"]))
+        self.assertTrue(self.check(["docs/design_notes.md"]))
         self.assertTrue(self.check(["data/db.json"]))
         self.assertTrue(self.check(["tests/test_combat.py"]))
 
@@ -59,6 +67,11 @@ class EvaluateTests(unittest.TestCase):
 
 
 class RealFileTests(unittest.TestCase):
+    def test_repo_has_todo_backlog(self):
+        text = open(os.path.join(ROOT, "docs", "TODO.md"), encoding="utf-8").read()
+        for heading in ("## 1. 결정 대기", "## 2. 다음에 할 일", "## 6. 최근 완료"):
+            self.assertIn(heading, text)
+
     def test_repo_claude_md_has_required_structure(self):
         text = open(os.path.join(ROOT, "CLAUDE.md"), encoding="utf-8").read()
         self.assertTrue(ch.DATE_RE.search(text), "현재 상태 제목")

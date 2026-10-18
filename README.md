@@ -1,6 +1,6 @@
 # 던전 앤 스톤 (gamemaker1)
 
-GameMaker(GML)로 만드는 영구사망 서바이벌 RPG. 기획서는 [`docs/design_notes_v6.md`](docs/design_notes_v6.md).
+GameMaker(GML)로 만드는 영구사망 서바이벌 RPG. 기획서는 [`docs/design/`](docs/design/README.md) (요소별 문서), 할 일은 [`docs/TODO.md`](docs/TODO.md).
 
 ## 구조
 
