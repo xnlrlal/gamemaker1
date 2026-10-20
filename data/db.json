@@ -158,7 +158,7 @@
   },
 
   "monsters": {
-    "gnome":            { "name_ko": "노움",         "grade": 9, "floor": 1, "zone": "north", "ranged": false },
+    "gnome":            { "name_ko": "노움",         "grade": 9, "floor": 1, "zone": "north", "ranged": false, "stat_override": { "strength": -2, "phys_res": 4, "flexibility": -5 } },
     "blade_wolf":       { "name_ko": "칼날늑대",     "grade": 9, "floor": 1, "zone": "east",  "ranged": false, "stat_override": {"strength": -2, "agility": 1, "flexibility": 5}, "skills": ["bite", "slash"] },
     "goblin":           { "name_ko": "고블린",       "grade": 9, "floor": 1, "zone": "south", "ranged": false, "stat_override": { "strength": -8, "accuracy": -10 } },
     "ghoul":            { "name_ko": "구울",         "grade": 9, "floor": 1, "zone": "west",  "ranged": false, "stat_override": { "strength": 3, "agility": 1, "flexibility": -8, "accuracy": -8 }, "skills": ["rend", "slash"] },
