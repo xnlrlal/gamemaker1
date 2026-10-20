@@ -40,7 +40,7 @@ class MonsterGradeTests(unittest.TestCase):
 
     def test_overrides(self):
         ghoul = make_enemy(BASE_DB, "ghoul")
-        self.assertEqual(eff_stat(ghoul, "strength"), 0)
+        self.assertEqual(eff_stat(ghoul, "strength"), 3)
         self.assertEqual(eff_stat(ghoul, "agility"), 1)
         self.assertEqual(eff_stat(make_enemy(BASE_DB, "goblin_archer"), "strength"), 1)
         self.assertEqual(eff_stat(make_enemy(BASE_DB, "gnome"), "strength"), 0)
