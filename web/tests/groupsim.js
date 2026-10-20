@@ -24,7 +24,7 @@ function run(seed, weapon, id, n) {
     const near = d.monsters.slice().sort((a, b) => DS.manhattan(a.pos, p.pos) - DS.manhattan(b.pos, p.pos));
     const tgt = near.find((m) => DS.canUseSkill(G, 'slash', m).ok) || null;
     if (tgt) { const r = DS.playerAttackDefault(G, tgt.uid); if (!r.ok) DS.playerWait(G); }
-    else if (d.monsters.some((m) => m.alert)) DS.playerWait(G);
+    else if (d.monsters.some((m) => m.alert && !m.fleeing)) DS.playerWait(G);
     else { const path = DS.findPath(f, p.pos, near[0].pos); if (path && path.length > 1) DS.playerMove(G, path[0].x - p.pos.x, path[0].y - p.pos.y); else DS.playerWait(G); }
   }
   const win = G.screen === 'dungeon' && !d.monsters.length;

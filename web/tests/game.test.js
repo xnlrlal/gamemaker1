@@ -490,3 +490,48 @@ test('기본 공격(적 탭)은 쓸 수 있는 가장 강한 공격 스킬을 �
   const r = DS.playerAttackDefault(G, m.uid);
   assert.ok(r.ok, '영혼력 3 이면 베기로 내려간다');
 });
+
+// ------------------------------------------------------------ 고블린: 마비독과 도주
+test('마비: 능력치(명중률·유연성)를 스택만큼 깎고, 시간이 지나면 풀린다', () => {
+  const G = inDungeon(1, 'sword');
+  const p = G.char.player;
+  const acc0 = DS.effStat(p, 'accuracy'), flex0 = DS.effStat(p, 'flexibility');
+  const st = { rng: G.rng, log: [] };
+  DS.applyStatus(st, p, 'paralysis', 1, 2);
+  const pen = DS.db.rules.status.paralysis.stat_penalty;
+  assert.strictEqual(DS.effStat(p, 'accuracy'), acc0 + pen.accuracy);
+  assert.strictEqual(DS.effStat(p, 'flexibility'), flex0 + pen.flexibility);
+  DS.applyStatus(st, p, 'paralysis', 1, 2);
+  assert.strictEqual(DS.effStat(p, 'accuracy'), acc0 + pen.accuracy * 2);
+  DS.applyStatus(st, p, 'paralysis', 5, 2); // 스택 상한
+  assert.strictEqual(p.status.paralysis.stacks, DS.db.rules.status.paralysis.stack_cap);
+  const hp0 = p.hp;
+  DS.playerWait(G); DS.playerWait(G);
+  assert.ok(!p.status.paralysis, '마비는 지속 시간이 끝나면 풀린다');
+  assert.ok(p.hp >= hp0 - 0.01, '마비는 직접 피해를 주지 않는다');
+  assert.strictEqual(DS.effStat(p, 'accuracy'), acc0);
+});
+
+test('고블린은 체력이 바닥나면 플레이어에게서 멀어진다(막다른 곳이면 맞서 싸움)', () => {
+  const G = inDungeon(1, 'sword');
+  const p = G.char.player;
+  const pos = openTileAt(G, 2, 3);
+  const g = place(G, 'goblin', pos.x, pos.y);
+  g.alert = true; g.alert_turns = 6; g.hp = 10;
+  DS.db.rules.ai.flee_move_chance = 1;
+  const d0 = Math.hypot(g.pos.x - p.pos.x, g.pos.y - p.pos.y);
+  DS.playerWait(G);
+  const d1 = Math.hypot(g.pos.x - p.pos.x, g.pos.y - p.pos.y);
+  DS.db.rules.ai.flee_move_chance = 0.5;
+  assert.ok(g.fleeing, '도망 상태');
+  assert.ok(d1 > d0 || !g.alive, '멀어졌다');
+});
+
+test('체력이 충분한 고블린은 도망치지 않는다', () => {
+  const G = inDungeon(1, 'sword');
+  const pos = openTileAt(G, 2, 3);
+  const g = place(G, 'goblin', pos.x, pos.y);
+  g.alert = true; g.alert_turns = 6;
+  DS.playerWait(G);
+  assert.ok(!g.fleeing);
+});

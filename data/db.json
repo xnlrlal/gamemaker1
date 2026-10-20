@@ -4,7 +4,7 @@
     "note": "기획서 v6 기준. 'temp' 표시가 없어도 규칙 수치(rules.*)와 스킬 수치(skills.*)는 전부 임시값이며 시뮬레이션으로 조정한다. 종족·장비·몬스터 등급 공식은 기획서 원문 값."
   },
 
-  "status_names": { "poison": "독", "bleed": "출혈", "stun": "기절" },
+  "status_names": { "poison": "독", "bleed": "출혈", "stun": "기절", "paralysis": "마비" },
   "part_names": { "torso": "몸통", "left_arm": "왼팔", "right_arm": "오른팔", "left_leg": "왼다리", "right_leg": "오른다리" },
   "stat_names": {
     "strength": "근력", "phys_res": "물리내성", "regen": "자연재생", "accuracy": "명중률",
@@ -63,7 +63,7 @@
     "spirit_regen_per_point": 1.0,
     "max_rounds": 200,
 
-    "ai": { "guard_hp_threshold": 0.5 },
+    "ai": { "guard_hp_threshold": 0.5, "flee_hp_threshold": 0.25, "flee_move_chance": 0.5 },
 
     "actions": { "base": 1, "cap": 3, "extra_per_agility": 0.2 },
 
@@ -93,6 +93,7 @@
     "status": {
       "poison": { "damage_per_stack": 2.0, "stack_cap": 5, "resist_stat": "poison_res", "resist_per_point": 0.05, "min_factor": 0.2 },
       "bleed": { "damage_per_stack": 2.0, "stack_cap": 5 },
+      "paralysis": { "damage_per_stack": 0, "stack_cap": 3, "stat_penalty": { "accuracy": -4, "flexibility": -4 } },
       "stun": { "resist_stat": "endurance", "resist_per_point": 0.05, "max_resist": 0.75 }
     },
 
@@ -122,6 +123,8 @@
 
     "bite":         { "name_ko": "물어뜯기",   "kind": "attack", "power": 10, "cost": 4, "cooldown": 1,
                       "on_hit": [ { "status": "bleed", "stacks": 1, "duration": 3 } ] },
+    "poison_stab":  { "name_ko": "독칼질",     "kind": "attack", "power": 10, "cost": 3, "cooldown": 0,
+                      "on_hit": [ { "status": "paralysis", "chance": 0.5, "stacks": 1, "duration": 4 } ] },
     "rend":         { "name_ko": "찢기",       "kind": "attack", "power": 24, "cost": 5, "cooldown": 1 },
     "shoot":        { "name_ko": "사격",       "kind": "attack", "power": 10, "cost": 3, "cooldown": 0, "range": 5 },
     "aimed_shot":   { "name_ko": "조준 사격",  "kind": "attack", "power": 18, "cost": 8, "cooldown": 3, "range": 5 },
@@ -160,7 +163,7 @@
   "monsters": {
     "gnome":            { "name_ko": "노움",         "grade": 9, "floor": 1, "zone": "north", "ranged": false, "stat_override": { "strength": -2, "phys_res": 4, "flexibility": -5 } },
     "blade_wolf":       { "name_ko": "칼날늑대",     "grade": 9, "floor": 1, "zone": "east",  "ranged": false, "stat_override": {"strength": -2, "agility": 1, "flexibility": 5}, "skills": ["bite", "slash"] },
-    "goblin":           { "name_ko": "고블린",       "grade": 9, "floor": 1, "zone": "south", "ranged": false, "stat_override": { "strength": -8, "accuracy": -10 } },
+    "goblin":           { "name_ko": "고블린",       "grade": 9, "floor": 1, "zone": "south", "ranged": false, "stat_override": { "strength": -8, "accuracy": -10 }, "skills": ["poison_stab", "slash"], "ai": "flee_when_hurt" },
     "ghoul":            { "name_ko": "구울",         "grade": 9, "floor": 1, "zone": "west",  "ranged": false, "stat_override": { "strength": 3, "agility": 1, "flexibility": -8, "accuracy": -8 }, "skills": ["rend", "slash"] },
 
     "goblin_swordsman": { "name_ko": "고블린 검사",   "grade": 9, "floor": 2, "zone": "north", "ranged": false, "stat_override": { "strength": 1 }, "skills": ["pierce", "slash"] },

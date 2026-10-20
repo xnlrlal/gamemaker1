@@ -186,6 +186,25 @@ function monsterChoose(G, m, p) {
   return { sid: best, self: false };
 }
 
+/** 체력이 바닥난 겁쟁이(고블린)는 플레이어에게서 멀어지는 칸으로 한 칸 도망친다. 막다른 곳이면 false(맞서 싸움). */
+function monsterFlee(G, ts, m, p) {
+  const floor = DS.getFloor();
+  const taken = new Set(G.dungeon.monsters.filter((o) => o.alive && o !== m).map((o) => o.pos.y * floor.width + o.pos.x));
+  taken.add(p.pos.y * floor.width + p.pos.x);
+  let best = null, bd = Math.hypot(m.pos.x - p.pos.x, m.pos.y - p.pos.y);
+  for (const [dx, dy] of DS.DIRS) {
+    const x = m.pos.x + dx, y = m.pos.y + dy;
+    if (!DS.isOpen(floor, x, y) || taken.has(y * floor.width + x)) continue;
+    const d = Math.hypot(x - p.pos.x, y - p.pos.y);
+    if (d > bd) { best = { x, y }; bd = d; }
+  }
+  if (!best) return false;
+  if (DS.rand(ts.rng) >= DS.db.rules.ai.flee_move_chance) { ts.log.push('T' + ts.round + ' ' + m.name + '이(가) 겁먹어 주춤거린다.'); return true; } // 다친 몸이라 매 턴 달아나지는 못한다
+  if (!m.fleeing) { m.fleeing = true; ts.log.push('T' + ts.round + ' ' + m.name + '이(가) 겁에 질려 도망친다!'); }
+  m.pos = best;
+  return true;
+}
+
 function monsterTurn(G, ts, m) {
   const floor = DS.getFloor(), cfg = DS.db.dungeon.floor1, p = G.char.player;
   const dist = Math.hypot(m.pos.x - p.pos.x, m.pos.y - p.pos.y);
@@ -203,6 +222,7 @@ function monsterTurn(G, ts, m) {
   if (!m.alert) return;
   m.shield = 0; // 방어막은 다음 자기 턴 시작까지 유지 [임시 규칙]
   if (m.stunned) { m.stunned = false; ts.log.push('T' + ts.round + ' ' + m.name + ' 기절로 행동 불가'); return; }
+  if (m.ai === 'flee_when_hurt' && m.hp < m.max_hp * DS.db.rules.ai.flee_hp_threshold && monsterFlee(G, ts, m, p)) return;
   const n = DS.actionCount(m); // 민첩성이 높을수록 한 턴에 여러 번 공격할 수 있다
   for (let i = 0; i < n && p.alive; i++) {
     const choice = monsterChoose(G, m, p);
@@ -223,7 +243,7 @@ function unitEndTurn(G, ts, c) {
     const e = c.status[sid];
     let dmg = e.stacks * st[sid].damage_per_stack;
     if (sid === 'poison') dmg *= Math.max(st.poison.min_factor, 1 - DS.effStat(c, st.poison.resist_stat) * st.poison.resist_per_point);
-    if (c.alive) {
+    if (c.alive && dmg > 0) {
       ts.log.push('T' + ts.round + ' ' + c.name + ' ' + (DS.db.status_names[sid] || sid) + ' 피해 ' + (Math.round(dmg * 10) / 10).toFixed(1));
       c.hp -= dmg;
       if (c.hp <= 0) { c.hp = 0; c.alive = false; ts.log.push('T' + ts.round + ' ' + c.name + ' 쓰러짐'); }
