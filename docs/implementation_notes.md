@@ -108,6 +108,7 @@
 | `src/game.js` | 상태 머신(화면 전환·저장·시계) | 생존 수치, 밤친구, 상점 |
 | `src/ui.js` | DOM·캔버스 | 화면 추가 |
 | `data/db.json` | 모든 고정값 | 수치 조정은 코드 수정 없이 여기서 |
+| `data/dungeon_stone.db` | 같은 고정값의 SQLite 표 형태 | `scripts/db_tool.py build/export/check` 로 db.json 과 변환. 표: skills·races·items·monsters·settings(점 경로). 수치를 고치면 db.json 수정 후 `build` 로 다시 만든다(테스트가 어긋남을 잡는다) |
 
 게임 상태 `G` 는 JSON 으로 그대로 저장되며 전투 도중 상태(난수 포함)까지 복원된다(2-2). 규칙 코드는 DOM 을 모르므로 Node 에서 테스트되고, 나중에 GML 로 옮길 때 그대로 기준 구현이 된다.
 
