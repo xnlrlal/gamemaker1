@@ -6,9 +6,12 @@
 """
 import json
 import os
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
+sys.path.insert(0, os.path.join(ROOT, "scripts"))
+import db_tool  # noqa: E402  브라우저는 SQLite 를 못 열어 빌드할 때 DB 내용을 HTML 에 넣는다
 ORDER = ["rng", "entities", "combat", "world", "tactics", "game", "icons", "ui"]
 FONTS = ("https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@800&"
          "family=Noto+Sans+KR:wght@400;600;700&display=swap")
@@ -25,7 +28,7 @@ def bundle():
         src = read(HERE, "src", name + ".js")
         # 파일마다 `const DS = ...` 가 있으므로 하나의 스크립트로 합칠 때는 각자 함수 범위로 감싼다.
         parts.append("(function(){\n" + src + "\n})();")
-    db = json.dumps(json.load(open(os.path.join(ROOT, "data", "db.json"), encoding="utf-8")), ensure_ascii=False)
+    db = json.dumps(db_tool.export(db_tool.DB_PATH), ensure_ascii=False)
     db = db.replace("</", "<\\/")
     parts.append("globalThis.DS.db = " + db + ";\nglobalThis.DS.boot();")
     return "\n".join(parts)

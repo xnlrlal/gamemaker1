@@ -24,10 +24,11 @@
 | 13. 고블린 무리 | 고블린 근력 −8·명중률 −10 → 3~4마리 무리도 6종 무기 모두 100%. 지도 위 무리 전투 측정 스크립트 `web/tests/groupsim.js` 추가 | claude/annyeong-k6unuy |
 | 14. 1층 몬스터 특성 | 구울(근력 3·유연성 −8·명중률 −8), 칼날늑대(근력 −2·민첩성 1·유연성 5), 노움(근력 −2·물리내성 4·유연성 −5) 에 특성 부여. 밸런스 기준은 1레벨·정수 0개·첫 입장 | claude/ccr-2a306ed1-givkhe |
 | 15. 고블린 특성 | 마비 상태(명중률·유연성 감소)와 독칼질, 체력 25% 미만 도주, 암흑지역(시야 1)과 고블린 어둠 보너스, 고블린 덫(감지 3칸·기습·처치 시 영구 안전) | claude/ccr-2a306ed1-givkhe |
+| 16. 고정 수치 DB | 고정값을 SQLite(`data/dungeon_stone.db`)에 표로 저장, `scripts/db_tool.py` 로 db.json 과 상호 변환·점검. sim·Node 테스트·웹 빌드가 DB 를 직접 읽음 | ccr-a83794eb-fwj67u |
 
 ## 구조
 - `data/db.json` 모든 고정값 · `sim/` Python 참조 구현 · `web/src/` JS 로직·UI · `web/build.py` 한 파일 빌드 · `tests/`, `web/tests/` 테스트
-- 검증: Python 64개, Node 40개, Python↔JS 승률 일치 10개 조합, 크로미움 E2E(모바일 화면)
+- 검증: Python 67개, Node 40개, Python↔JS 승률 일치 10개 조합, 크로미움 E2E(모바일 화면)
 
 ## 알려진 한계 / 다음 할 일
 - 수치는 모두 임시값이다. 고블린 외 몬스터(구울·노움·칼날늑대)는 2마리 이상 동시 전투에서 승률이 0% 근처라 밸런스를 다시 맞춰야 한다(`groupsim.js`).
