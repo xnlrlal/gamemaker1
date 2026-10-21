@@ -1,12 +1,14 @@
 """db.json 로딩과 검증.
 
-GameMaker 쪽의 `dungeon_stone.db -> db.json` 과 같은 파일을 읽는다.
-전투 코드에는 숫자를 하드코딩하지 않고 전부 여기서 읽은 값을 쓴다.
+기본은 SQLite `data/dungeon_stone.db` 를 읽고(`scripts/db_tool.py` 의 export),
+경로가 .json 이면 그 JSON 을 읽는다. 전투 코드에는 숫자를 하드코딩하지 않고 전부 여기서 읽은 값을 쓴다.
 """
 import json
 import os
+import sys
 
-DEFAULT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "db.json")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DEFAULT_PATH = os.path.join(ROOT, "data", "dungeon_stone.db")
 
 VALID_AI = ("highest_value", "attack_only", "random", "guard_when_hurt", "flee_when_hurt")
 RACE_REQUIRED_STATS = ("spirit", "body", "mind", "psychic", "strength", "phys_res", "regen", "smell")
@@ -17,8 +19,17 @@ class DbError(ValueError):
 
 
 def load_db(path=None):
-    with open(path or DEFAULT_PATH, encoding="utf-8") as f:
-        db = json.load(f)
+    path = path or DEFAULT_PATH
+    if path.endswith(".json"):
+        with open(path, encoding="utf-8") as f:
+            db = json.load(f)
+    else:
+        sys.path.insert(0, os.path.join(ROOT, "scripts"))
+        try:
+            import db_tool
+        finally:
+            sys.path.pop(0)
+        db = db_tool.export(path)
     validate_db(db)
     return db
 
