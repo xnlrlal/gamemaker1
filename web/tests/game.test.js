@@ -535,3 +535,41 @@ test('체력이 충분한 고블린은 도망치지 않는다', () => {
   DS.playerWait(G);
   assert.ok(!g.fleeing);
 });
+
+// ------------------------------------------------------------ 암흑지역
+test('암흑지역: 시작점에서 먼 칸만 어둡고, 서 있으면 시야가 줄어든다', () => {
+  const G = inDungeon(1, 'sword');
+  const f = floor(), r = DS.db.dungeon.floor1.dark_radius;
+  let darkTile = null, litTile = null;
+  for (let y = 0; y < f.height; y++) for (let x = 0; x < f.width; x++) {
+    if (!DS.isOpen(f, x, y)) continue;
+    if (DS.isDark(f, x, y)) darkTile = darkTile || { x, y }; else litTile = litTile || { x, y };
+    assert.strictEqual(DS.isDark(f, x, y), Math.hypot(x - f.start.x, y - f.start.y) >= r);
+  }
+  assert.ok(darkTile && litTile, '어두운 칸과 밝은 칸이 모두 있다');
+  assert.strictEqual(DS.isDark(f, 0, 0), false, '벽은 어둡지 않다');
+  G.dungeon.pos = { ...litTile };
+  assert.strictEqual(DS.visionRadius(G), DS.db.dungeon.local_vision);
+  G.dungeon.pos = { ...darkTile };
+  assert.strictEqual(DS.visionRadius(G), DS.db.dungeon.floor1.dark_vision);
+});
+
+test('고블린은 암흑지역에서 선공 범위가 넓고 능력치가 오른다', () => {
+  const f0 = floor();
+  const darkOpen = []; const litOpen = [];
+  for (let y = 0; y < f0.height; y++) for (let x = 0; x < f0.width; x++) if (DS.isOpen(f0, x, y)) (DS.isDark(f0, x, y) ? darkOpen : litOpen).push({ x, y });
+  const dark = darkOpen[0];
+  const near = (c) => [[2, 0], [-2, 0], [0, 2], [0, -2]].map(([dx, dy]) => ({ x: c.x + dx, y: c.y + dy })).find((q) => DS.isOpen(f0, q.x, q.y));
+  // 어두운 곳의 고블린: 2칸 거리에서도 눈치챈다 / 밝은 곳의 고블린: 2칸 거리에서는 못 챈다
+  for (const [label, tile, expectAlert] of [['dark', dark, true], ['lit', litOpen[0], false]]) {
+    const G = inDungeon(1, 'sword');
+    const q = near(tile);
+    if (!q) continue;
+    G.dungeon.pos = { ...q }; G.char.player.pos = { ...q };
+    const g = place(G, 'goblin', tile.x, tile.y);
+    DS.playerWait(G);
+    assert.strictEqual(g.alert, expectAlert, label);
+    if (expectAlert) assert.ok(DS.effStat(g, 'strength') > DS.db.monsters.goblin.stat_override.strength, '어둠 보너스');
+    else assert.ok(!g.env_bonus);
+  }
+});

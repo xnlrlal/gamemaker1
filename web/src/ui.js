@@ -418,7 +418,7 @@
     const floor = DS.getFloor(), vs = DS.visitedSet(G);
     if (ui.mapMode === 'local') {
       const p = G.dungeon.pos;
-      if (Math.hypot(x - p.x, y - p.y) <= DS.db.dungeon.local_vision) return true;
+      if (Math.hypot(x - p.x, y - p.y) <= DS.visionRadius(G)) return true;
     }
     if (vs.has(y * floor.width + x)) return true;
     for (const [dx, dy] of DS.DIRS) if (vs.has((y + dy) * floor.width + (x + dx))) return true;
@@ -468,7 +468,7 @@
     const cx = prev.x + (pos.x - prev.x) * ui.alpha, cy = prev.y + (pos.y - prev.y) * ui.alpha;
     const halfX = Math.ceil(W / ts / 2) + 1, halfY = Math.ceil(H / ts / 2) + 1;
     const vs = DS.visitedSet(G);
-    const lightR = DS.db.dungeon.local_vision + 0.6;
+    const lightR = DS.visionRadius(G) + 0.6;
     for (let y = Math.floor(cy) - halfY; y <= Math.ceil(cy) + halfY; y++) {
       for (let x = Math.floor(cx) - halfX; x <= Math.ceil(cx) + halfX; x++) {
         if (x < 0 || y < 0 || x >= floor.width || y >= floor.height || !visible(x, y)) continue;

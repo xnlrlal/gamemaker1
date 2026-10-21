@@ -16,6 +16,7 @@ DS.effStat = function (c, stat) {
   }
   v += c.part_penalty[stat] || 0;
   v += c.vs_bonus[stat] || 0;
+  if (c.env_bonus) v += c.env_bonus[stat] || 0; // 지형(어둠) 보너스 — 지도 위 전투에서만
   for (const e of Object.values(c.status || {})) if (e.penalty && e.penalty[stat]) v += e.penalty[stat] * e.stacks; // 마비 등 상태이상의 능력치 감소
   return v;
 };

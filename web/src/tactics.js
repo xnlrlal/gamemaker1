@@ -210,7 +210,11 @@ function monsterTurn(G, ts, m) {
   const dist = Math.hypot(m.pos.x - p.pos.x, m.pos.y - p.pos.y);
   // 처음 눈치채는 건 둘러싼 8칸(aggro_radius) 안에 들어왔을 때뿐 — 멀리서 보이는 것만으로는 선공하지 않는다.
   // 한 번 눈치챈 뒤에는 시야 반경 안에서 시선이 닿는 동안 계속 쫓는다.
-  const near = Math.max(Math.abs(m.pos.x - p.pos.x), Math.abs(m.pos.y - p.pos.y)) <= cfg.aggro_radius;
+  // 어둠 속에서 강해지는 몬스터(고블린)는 암흑지역 칸에 서 있을 때 선공 범위와 능력치가 늘어난다.
+  const db = DS.db.monsters[m.id], dark = !!(db && db.dark_bonus && DS.isDark(floor, m.pos.x, m.pos.y));
+  m.env_bonus = dark ? db.dark_bonus.stats : null;
+  const aggro = cfg.aggro_radius + (dark ? db.dark_bonus.aggro_radius : 0);
+  const near = Math.max(Math.abs(m.pos.x - p.pos.x), Math.abs(m.pos.y - p.pos.y)) <= aggro;
   const sees = m.alert ? dist <= cfg.sight_radius && DS.hasLos(floor, m.pos, p.pos) : near;
   if (sees) {
     if (!m.alert) { ts.log.push('T' + ts.round + ' ' + m.name + '이(가) 당신을 발견했다!'); m.alert = true; }
@@ -307,7 +311,7 @@ function playerTurnStart(G) { G.char.player.shield = 0; }
 /** 보이는(밝은) 적인가: 시야 반경 안이고 시선이 닿을 때. */
 DS.canSee = function (G, m) {
   const floor = DS.getFloor(), p = G.char.player;
-  return Math.hypot(m.pos.x - p.pos.x, m.pos.y - p.pos.y) <= DS.db.dungeon.local_vision + 0.6 && DS.hasLos(floor, p.pos, m.pos);
+  return Math.hypot(m.pos.x - p.pos.x, m.pos.y - p.pos.y) <= DS.visionRadius(G) + 0.6 && DS.hasLos(floor, p.pos, m.pos);
 };
 
 /** 상하좌우로 한 칸 이동(적이 있으면 기본 공격). */
