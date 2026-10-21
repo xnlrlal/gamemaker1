@@ -40,6 +40,7 @@
       "group_by_day": [1, 2, 3],
       "sight_radius": 6,
       "aggro_radius": 1,
+      "traps": { "count": 4, "min_dist": 8, "spacing": 6, "detect_radius": 3 },
       "dark_radius": 20,
       "dark_vision": 1,
       "lose_sight_turns": 6

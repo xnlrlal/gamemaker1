@@ -62,7 +62,7 @@ DS.enterDungeon = function (G) {
   p.pos = { x: floor.start.x, y: floor.start.y };
   G.dungeon = {
     elapsed_ms: 0, pos: { x: floor.start.x, y: floor.start.y }, steps: 0, turn: 0,
-    visited: [key(floor.start.x, floor.start.y)], monsters: [], camps: DS.spawnCamps(floor), log: [], day: 1,
+    visited: [key(floor.start.x, floor.start.y)], monsters: [], camps: DS.spawnCamps(floor), traps: DS.spawnTraps(floor), log: [], day: 1,
   };
   healFully(p);
   G.screen = 'dungeon';

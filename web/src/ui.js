@@ -511,6 +511,13 @@
       gl.addColorStop(0, found ? 'rgba(110,210,130,0.95)' : 'rgba(120,170,255,0.95)'); gl.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(sx, sy, ts * 0.8, 0, Math.PI * 2); ctx.fill();
     }
+    // 고블린 덫: 가까이 가면(덫 감지) 숨은 덫이 붉은 ✕ 로 표시된다.
+    for (const trap of G.dungeon.traps || []) {
+      if (!DS.trapDetected(G, trap) || !visible(trap.x, trap.y)) continue;
+      const sx = W / 2 + (trap.x - cx) * ts, sy = H / 2 + (trap.y - cy) * ts, r = ts * 0.28;
+      ctx.strokeStyle = 'rgba(230,80,70,0.95)'; ctx.lineWidth = Math.max(2, ts * 0.08); ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(sx - r, sy - r); ctx.lineTo(sx + r, sy + r); ctx.moveTo(sx + r, sy - r); ctx.lineTo(sx - r, sy + r); ctx.stroke();
+    }
     // 몬스터: 시야(밝은 곳 + 시선)에 들어온 적만 보인다.
     const u = Math.max(2.4, ts * 0.058);
     const armedTargets = ui.armed ? new Set(visibleMonsters().filter((m) => DS.canUseSkill(G, ui.armed, m).ok).map((m) => m.uid)) : new Set();

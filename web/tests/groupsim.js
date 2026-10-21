@@ -6,7 +6,7 @@ function run(seed, weapon, id, n) {
   const G = DS.newGame(seed); DS.createChar(G, weapon); DS.enterDungeon(G);
   const f = DS.getFloor(), p = G.char.player, d = G.dungeon;
   const camps = d.camps.filter((c) => c.zone !== 'center'); const camp = camps[seed % camps.length];
-  d.monsters = []; d.camps.forEach((c) => { c.state = 'active'; });
+  d.monsters = []; d.traps = []; d.camps.forEach((c) => { c.state = 'active'; });
   // 무리: 진영 중심 2칸 안
   const occ = new Set(); let k = 0;
   for (let dy = -2; dy <= 2 && k < n; dy++) for (let dx = -2; dx <= 2 && k < n; dx++) {

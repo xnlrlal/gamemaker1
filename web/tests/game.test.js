@@ -15,6 +15,7 @@ function inDungeon(seed = 1, weapon = 'greatsword') {
   const G = newChar(seed, weapon);
   DS.enterDungeon(G);
   G.dungeon.monsters = []; // 테스트에서는 직접 배치한다
+  G.dungeon.traps = []; // 덫도 필요한 테스트에서만 직접 둔다
   G.dungeon.camps.forEach((c) => { c.state = 'active'; }); // 진영이 저절로 나타나지 않게 막는다
   return G;
 }
@@ -572,4 +573,41 @@ test('고블린은 암흑지역에서 선공 범위가 넓고 능력치가 오�
     if (expectAlert) assert.ok(DS.effStat(g, 'strength') > DS.db.monsters.goblin.stat_override.strength, '어둠 보너스');
     else assert.ok(!g.env_bonus);
   }
+});
+
+// ------------------------------------------------------------ 고블린 덫
+test('덫: 남쪽에 고정 자리, 가까이 가야 보이고, 밟으면 고블린이 덮치며 처치하면 영구 안전', () => {
+  const f = floor();
+  const traps = DS.spawnTraps(f);
+  assert.strictEqual(traps.length, DS.db.dungeon.floor1.traps.count);
+  assert.deepStrictEqual(DS.spawnTraps(f), traps, '같은 세계는 같은 자리');
+  for (const t of traps) assert.strictEqual(DS.zoneAt(f, t.x, t.y), 'south');
+
+  const G = inDungeon(1, 'greatsword');
+  const t = traps[0];
+  const nb = DS.DIRS.map(([dx, dy]) => ({ x: t.x + dx, y: t.y + dy })).find((q) => DS.isOpen(f, q.x, q.y) && !DS.isDark(f, q.x, q.y));
+  G.dungeon.traps = [{ ...t }];
+  G.dungeon.pos = { ...nb }; G.char.player.pos = { ...nb };
+  assert.ok(DS.trapDetected(G, G.dungeon.traps[0]), '가까이 가면 보인다');
+  G.dungeon.pos = { x: t.x + 20, y: t.y }; // 멀리서는 안 보인다
+  assert.ok(!DS.trapDetected(G, G.dungeon.traps[0]));
+  G.dungeon.pos = { ...nb };
+
+  const hp0 = G.char.player.hp;
+  const r = DS.playerMove(G, t.x - nb.x, t.y - nb.y);
+  assert.ok(r.ok && r.moved);
+  const trap = G.dungeon.traps[0];
+  assert.strictEqual(trap.state, 'sprung');
+  const gobs = G.dungeon.monsters.filter((m) => m.trap === trap.id);
+  assert.ok(gobs.length >= 1 && gobs.every((m) => m.id === 'goblin' && m.alert));
+  assert.ok(G.char.player.hp <= hp0, '기습으로 먼저 맞을 수 있다');
+  for (const m of gobs) m.hp = 0, m.alive = false; // 처치
+  DS.playerWait(G);
+  assert.strictEqual(G.dungeon.traps[0].state, 'safe');
+  // 안전해진 덫은 다시 밟아도 아무 일이 없다
+  const away = DS.DIRS.map(([dx, dy]) => ({ x: t.x + dx, y: t.y + dy })).find((q) => DS.isOpen(f, q.x, q.y));
+  G.dungeon.pos = { ...away }; G.char.player.pos = { ...away };
+  const n0 = G.dungeon.monsters.length;
+  DS.playerMove(G, t.x - away.x, t.y - away.y);
+  assert.strictEqual(G.dungeon.monsters.length, n0);
 });
