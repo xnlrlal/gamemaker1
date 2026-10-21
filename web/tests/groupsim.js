@@ -6,7 +6,7 @@ function run(seed, weapon, id, n) {
   const G = DS.newGame(seed); DS.createChar(G, weapon); DS.enterDungeon(G);
   const f = DS.getFloor(), p = G.char.player, d = G.dungeon;
   const camps = d.camps.filter((c) => c.zone !== 'center'); const camp = camps[seed % camps.length];
-  d.monsters = []; d.camps.forEach((c) => { c.state = 'active'; });
+  d.monsters = []; d.traps = []; d.camps.forEach((c) => { c.state = 'active'; });
   // 무리: 진영 중심 2칸 안
   const occ = new Set(); let k = 0;
   for (let dy = -2; dy <= 2 && k < n; dy++) for (let dx = -2; dx <= 2 && k < n; dx++) {
@@ -24,7 +24,7 @@ function run(seed, weapon, id, n) {
     const near = d.monsters.slice().sort((a, b) => DS.manhattan(a.pos, p.pos) - DS.manhattan(b.pos, p.pos));
     const tgt = near.find((m) => DS.canUseSkill(G, 'slash', m).ok) || null;
     if (tgt) { const r = DS.playerAttackDefault(G, tgt.uid); if (!r.ok) DS.playerWait(G); }
-    else if (d.monsters.some((m) => m.alert)) DS.playerWait(G);
+    else if (d.monsters.some((m) => m.alert && !m.fleeing)) DS.playerWait(G);
     else { const path = DS.findPath(f, p.pos, near[0].pos); if (path && path.length > 1) DS.playerMove(G, path[0].x - p.pos.x, path[0].y - p.pos.y); else DS.playerWait(G); }
   }
   const win = G.screen === 'dungeon' && !d.monsters.length;

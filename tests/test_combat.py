@@ -40,10 +40,12 @@ class MonsterGradeTests(unittest.TestCase):
 
     def test_overrides(self):
         ghoul = make_enemy(BASE_DB, "ghoul")
-        self.assertEqual(eff_stat(ghoul, "strength"), 0)
+        self.assertEqual(eff_stat(ghoul, "strength"), 3)
         self.assertEqual(eff_stat(ghoul, "agility"), 1)
         self.assertEqual(eff_stat(make_enemy(BASE_DB, "goblin_archer"), "strength"), 1)
-        self.assertEqual(eff_stat(make_enemy(BASE_DB, "gnome"), "strength"), 0)
+        gnome = make_enemy(BASE_DB, "gnome")
+        self.assertEqual(eff_stat(gnome, "strength"), -2)
+        self.assertEqual(eff_stat(gnome, "phys_res"), 4)
 
 
 class PlayerBuildTests(unittest.TestCase):
@@ -106,6 +108,7 @@ class JudgementTests(unittest.TestCase):
         db["rules"]["hit"].update({"base": 1.0, "min": 1.0, "max": 1.0})
         db["rules"]["crit"].update({"base": 0.0, "max": 0.0})
         db["rules"]["part_damage"]["chance"] = 0.0
+        del db["monsters"]["gnome"]["stat_override"]  # 노움 개별 보정을 빼 순수 9등급 기준으로 계산
         db, p, e, st = fresh("gnome", db=db)
         combat.do_action(st, p, "slash")
         self.assertAlmostEqual(e["hp"], 100 - 16)

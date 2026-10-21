@@ -418,7 +418,7 @@
     const floor = DS.getFloor(), vs = DS.visitedSet(G);
     if (ui.mapMode === 'local') {
       const p = G.dungeon.pos;
-      if (Math.hypot(x - p.x, y - p.y) <= DS.db.dungeon.local_vision) return true;
+      if (Math.hypot(x - p.x, y - p.y) <= DS.visionRadius(G)) return true;
     }
     if (vs.has(y * floor.width + x)) return true;
     for (const [dx, dy] of DS.DIRS) if (vs.has((y + dy) * floor.width + (x + dx))) return true;
@@ -468,7 +468,7 @@
     const cx = prev.x + (pos.x - prev.x) * ui.alpha, cy = prev.y + (pos.y - prev.y) * ui.alpha;
     const halfX = Math.ceil(W / ts / 2) + 1, halfY = Math.ceil(H / ts / 2) + 1;
     const vs = DS.visitedSet(G);
-    const lightR = DS.db.dungeon.local_vision + 0.6;
+    const lightR = DS.visionRadius(G) + 0.6;
     for (let y = Math.floor(cy) - halfY; y <= Math.ceil(cy) + halfY; y++) {
       for (let x = Math.floor(cx) - halfX; x <= Math.ceil(cx) + halfX; x++) {
         if (x < 0 || y < 0 || x >= floor.width || y >= floor.height || !visible(x, y)) continue;
@@ -510,6 +510,13 @@
       const gl = ctx.createRadialGradient(sx, sy, 0, sx, sy, ts * 0.8);
       gl.addColorStop(0, found ? 'rgba(110,210,130,0.95)' : 'rgba(120,170,255,0.95)'); gl.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(sx, sy, ts * 0.8, 0, Math.PI * 2); ctx.fill();
+    }
+    // 고블린 덫: 가까이 가면(덫 감지) 숨은 덫이 붉은 ✕ 로 표시된다.
+    for (const trap of G.dungeon.traps || []) {
+      if (!DS.trapDetected(G, trap) || !visible(trap.x, trap.y)) continue;
+      const sx = W / 2 + (trap.x - cx) * ts, sy = H / 2 + (trap.y - cy) * ts, r = ts * 0.28;
+      ctx.strokeStyle = 'rgba(230,80,70,0.95)'; ctx.lineWidth = Math.max(2, ts * 0.08); ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(sx - r, sy - r); ctx.lineTo(sx + r, sy + r); ctx.moveTo(sx + r, sy - r); ctx.lineTo(sx - r, sy + r); ctx.stroke();
     }
     // 몬스터: 시야(밝은 곳 + 시선)에 들어온 적만 보인다.
     const u = Math.max(2.4, ts * 0.058);

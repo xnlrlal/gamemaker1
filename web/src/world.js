@@ -84,6 +84,17 @@ DS.zoneAt = function (floor, x, y) {
   return dy > 0 ? 'south' : 'north';
 };
 
+/** 암흑지역: 시작점에서 dark_radius 이상 떨어진 열린 칸(지도 가장자리, 7-2). 서 있으면 자기 칸 근처만 보인다. */
+DS.isDark = function (floor, x, y) {
+  return DS.isOpen(floor, x, y) && Math.hypot(x - floor.start.x, y - floor.start.y) >= floor.cfg.dark_radius;
+};
+
+/** 플레이어가 지금 볼 수 있는 반경(암흑지역에서는 dark_vision). */
+DS.visionRadius = function (G) {
+  const p = G.dungeon.pos;
+  return DS.isDark(DS.getFloor(), p.x, p.y) ? DS.db.dungeon.floor1.dark_vision : DS.db.dungeon.local_vision;
+};
+
 DS.isOpen = function (floor, x, y) {
   return !!(floor.grid[y] && floor.grid[y][x] === 0);
 };

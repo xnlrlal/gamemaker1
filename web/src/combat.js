@@ -46,6 +46,7 @@ DS.POLICIES = {
   highest_value: (st, a) => bestBy(st, a),
   attack_only: (st, a) => bestBy(st, a, (s) => s.kind === 'attack'),
   random: (st, a) => { const o = DS.usableSkills(st, a); return o.length ? DS.choice(st.rng, o) : null; },
+  flee_when_hurt: (st, a) => DS.POLICIES.attack_only(st, a), // 도망은 지도 위 전투(tactics)에서만
   guard_when_hurt: (st, a) => {
     if (a.hp < a.max_hp * DS.db.rules.ai.guard_hp_threshold) {
       for (const sid of DS.usableSkills(st, a)) if (DS.db.skills[sid].kind === 'defend') return sid;
@@ -96,6 +97,7 @@ DS.applyStatus = function (state, target, sid, stacks, duration) {
     cur.stacks = Math.min(cur.stacks + stacks, cfg.stack_cap);
     cur.duration = Math.max(cur.duration, duration); // 합산이 아니라 긴 쪽
   }
+  if (cfg.stat_penalty) target.status[sid].penalty = cfg.stat_penalty;
   log(state, target.name + ' ' + (DS.db.status_names[sid] || sid) + ' x' + target.status[sid].stacks);
 };
 
@@ -245,7 +247,7 @@ DS.endOfRound = function (state) {
       if (sid === 'poison') {
         dmg *= Math.max(st.poison.min_factor, 1 - eff(c, st.poison.resist_stat) * st.poison.resist_per_point);
       }
-      if (c.alive) {
+      if (c.alive && dmg > 0) {
         log(state, c.name + ' ' + (DS.db.status_names[sid] || sid) + ' 피해 ' + f1(dmg));
         loseHp(state, c, dmg);
       }

@@ -96,6 +96,7 @@ POLICIES = {
     "attack_only": policy_attack_only,
     "random": policy_random,
     "guard_when_hurt": policy_guard_when_hurt,
+    "flee_when_hurt": policy_attack_only,   # 도망은 지도 위 전투(web tactics)에서만 일어난다. 1대1 라운드 전투에서는 끝까지 싸운다
 }
 DEFAULT_POLICY = "highest_value"
 
@@ -145,6 +146,8 @@ def apply_status(state, target, status_id, stacks, duration):
     cur = target["status"].get(status_id)
     if cur is None:
         target["status"][status_id] = {"stacks": min(stacks, cfg["stack_cap"]), "duration": duration}
+        if cfg.get("stat_penalty"):
+            target["status"][status_id]["penalty"] = cfg["stat_penalty"]
     else:
         cur["stacks"] = min(cur["stacks"] + stacks, cfg["stack_cap"])
         cur["duration"] = max(cur["duration"], duration)   # 합산이 아니라 긴 쪽
@@ -317,7 +320,7 @@ def end_of_round(state):
                 factor = max(st["poison"]["min_factor"],
                              1 - eff_stat(c, st["poison"]["resist_stat"]) * st["poison"]["resist_per_point"])
                 dmg *= factor
-            if c["alive"]:
+            if c["alive"] and dmg > 0:
                 _log(state, "%s %s 피해 %.1f" % (c["name"], sid, dmg))
                 _lose_hp(state, c, dmg)
             eff["duration"] -= 1

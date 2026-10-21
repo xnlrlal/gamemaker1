@@ -15,6 +15,7 @@ function inDungeon(seed = 1, weapon = 'greatsword') {
   const G = newChar(seed, weapon);
   DS.enterDungeon(G);
   G.dungeon.monsters = []; // 테스트에서는 직접 배치한다
+  G.dungeon.traps = []; // 덫도 필요한 테스트에서만 직접 둔다
   G.dungeon.camps.forEach((c) => { c.state = 'active'; }); // 진영이 저절로 나타나지 않게 막는다
   return G;
 }
@@ -489,4 +490,124 @@ test('기본 공격(적 탭)은 쓸 수 있는 가장 강한 공격 스킬을 �
   p.skills.forEach((s) => { if (s !== 'slash') p.cooldowns[s] = 5; });
   const r = DS.playerAttackDefault(G, m.uid);
   assert.ok(r.ok, '영혼력 3 이면 베기로 내려간다');
+});
+
+// ------------------------------------------------------------ 고블린: 마비독과 도주
+test('마비: 능력치(명중률·유연성)를 스택만큼 깎고, 시간이 지나면 풀린다', () => {
+  const G = inDungeon(1, 'sword');
+  const p = G.char.player;
+  const acc0 = DS.effStat(p, 'accuracy'), flex0 = DS.effStat(p, 'flexibility');
+  const st = { rng: G.rng, log: [] };
+  DS.applyStatus(st, p, 'paralysis', 1, 2);
+  const pen = DS.db.rules.status.paralysis.stat_penalty;
+  assert.strictEqual(DS.effStat(p, 'accuracy'), acc0 + pen.accuracy);
+  assert.strictEqual(DS.effStat(p, 'flexibility'), flex0 + pen.flexibility);
+  DS.applyStatus(st, p, 'paralysis', 1, 2);
+  assert.strictEqual(DS.effStat(p, 'accuracy'), acc0 + pen.accuracy * 2);
+  DS.applyStatus(st, p, 'paralysis', 5, 2); // 스택 상한
+  assert.strictEqual(p.status.paralysis.stacks, DS.db.rules.status.paralysis.stack_cap);
+  const hp0 = p.hp;
+  DS.playerWait(G); DS.playerWait(G);
+  assert.ok(!p.status.paralysis, '마비는 지속 시간이 끝나면 풀린다');
+  assert.ok(p.hp >= hp0 - 0.01, '마비는 직접 피해를 주지 않는다');
+  assert.strictEqual(DS.effStat(p, 'accuracy'), acc0);
+});
+
+test('고블린은 체력이 바닥나면 플레이어에게서 멀어진다(막다른 곳이면 맞서 싸움)', () => {
+  const G = inDungeon(1, 'sword');
+  const p = G.char.player;
+  const pos = openTileAt(G, 2, 3);
+  const g = place(G, 'goblin', pos.x, pos.y);
+  g.alert = true; g.alert_turns = 6; g.hp = 10;
+  DS.db.rules.ai.flee_move_chance = 1;
+  const d0 = Math.hypot(g.pos.x - p.pos.x, g.pos.y - p.pos.y);
+  DS.playerWait(G);
+  const d1 = Math.hypot(g.pos.x - p.pos.x, g.pos.y - p.pos.y);
+  DS.db.rules.ai.flee_move_chance = 0.5;
+  assert.ok(g.fleeing, '도망 상태');
+  assert.ok(d1 > d0 || !g.alive, '멀어졌다');
+});
+
+test('체력이 충분한 고블린은 도망치지 않는다', () => {
+  const G = inDungeon(1, 'sword');
+  const pos = openTileAt(G, 2, 3);
+  const g = place(G, 'goblin', pos.x, pos.y);
+  g.alert = true; g.alert_turns = 6;
+  DS.playerWait(G);
+  assert.ok(!g.fleeing);
+});
+
+// ------------------------------------------------------------ 암흑지역
+test('암흑지역: 시작점에서 먼 칸만 어둡고, 서 있으면 시야가 줄어든다', () => {
+  const G = inDungeon(1, 'sword');
+  const f = floor(), r = DS.db.dungeon.floor1.dark_radius;
+  let darkTile = null, litTile = null;
+  for (let y = 0; y < f.height; y++) for (let x = 0; x < f.width; x++) {
+    if (!DS.isOpen(f, x, y)) continue;
+    if (DS.isDark(f, x, y)) darkTile = darkTile || { x, y }; else litTile = litTile || { x, y };
+    assert.strictEqual(DS.isDark(f, x, y), Math.hypot(x - f.start.x, y - f.start.y) >= r);
+  }
+  assert.ok(darkTile && litTile, '어두운 칸과 밝은 칸이 모두 있다');
+  assert.strictEqual(DS.isDark(f, 0, 0), false, '벽은 어둡지 않다');
+  G.dungeon.pos = { ...litTile };
+  assert.strictEqual(DS.visionRadius(G), DS.db.dungeon.local_vision);
+  G.dungeon.pos = { ...darkTile };
+  assert.strictEqual(DS.visionRadius(G), DS.db.dungeon.floor1.dark_vision);
+});
+
+test('고블린은 암흑지역에서 선공 범위가 넓고 능력치가 오른다', () => {
+  const f0 = floor();
+  const darkOpen = []; const litOpen = [];
+  for (let y = 0; y < f0.height; y++) for (let x = 0; x < f0.width; x++) if (DS.isOpen(f0, x, y)) (DS.isDark(f0, x, y) ? darkOpen : litOpen).push({ x, y });
+  const dark = darkOpen[0];
+  const near = (c) => [[2, 0], [-2, 0], [0, 2], [0, -2]].map(([dx, dy]) => ({ x: c.x + dx, y: c.y + dy })).find((q) => DS.isOpen(f0, q.x, q.y));
+  // 어두운 곳의 고블린: 2칸 거리에서도 눈치챈다 / 밝은 곳의 고블린: 2칸 거리에서는 못 챈다
+  for (const [label, tile, expectAlert] of [['dark', dark, true], ['lit', litOpen[0], false]]) {
+    const G = inDungeon(1, 'sword');
+    const q = near(tile);
+    if (!q) continue;
+    G.dungeon.pos = { ...q }; G.char.player.pos = { ...q };
+    const g = place(G, 'goblin', tile.x, tile.y);
+    DS.playerWait(G);
+    assert.strictEqual(g.alert, expectAlert, label);
+    if (expectAlert) assert.ok(DS.effStat(g, 'strength') > DS.db.monsters.goblin.stat_override.strength, '어둠 보너스');
+    else assert.ok(!g.env_bonus);
+  }
+});
+
+// ------------------------------------------------------------ 고블린 덫
+test('덫: 남쪽에 고정 자리, 가까이 가야 보이고, 밟으면 고블린이 덮치며 처치하면 영구 안전', () => {
+  const f = floor();
+  const traps = DS.spawnTraps(f);
+  assert.strictEqual(traps.length, DS.db.dungeon.floor1.traps.count);
+  assert.deepStrictEqual(DS.spawnTraps(f), traps, '같은 세계는 같은 자리');
+  for (const t of traps) assert.strictEqual(DS.zoneAt(f, t.x, t.y), 'south');
+
+  const G = inDungeon(1, 'greatsword');
+  const t = traps[0];
+  const nb = DS.DIRS.map(([dx, dy]) => ({ x: t.x + dx, y: t.y + dy })).find((q) => DS.isOpen(f, q.x, q.y) && !DS.isDark(f, q.x, q.y));
+  G.dungeon.traps = [{ ...t }];
+  G.dungeon.pos = { ...nb }; G.char.player.pos = { ...nb };
+  assert.ok(DS.trapDetected(G, G.dungeon.traps[0]), '가까이 가면 보인다');
+  G.dungeon.pos = { x: t.x + 20, y: t.y }; // 멀리서는 안 보인다
+  assert.ok(!DS.trapDetected(G, G.dungeon.traps[0]));
+  G.dungeon.pos = { ...nb };
+
+  const hp0 = G.char.player.hp;
+  const r = DS.playerMove(G, t.x - nb.x, t.y - nb.y);
+  assert.ok(r.ok && r.moved);
+  const trap = G.dungeon.traps[0];
+  assert.strictEqual(trap.state, 'sprung');
+  const gobs = G.dungeon.monsters.filter((m) => m.trap === trap.id);
+  assert.ok(gobs.length >= 1 && gobs.every((m) => m.id === 'goblin' && m.alert));
+  assert.ok(G.char.player.hp <= hp0, '기습으로 먼저 맞을 수 있다');
+  for (const m of gobs) m.hp = 0, m.alive = false; // 처치
+  DS.playerWait(G);
+  assert.strictEqual(G.dungeon.traps[0].state, 'safe');
+  // 안전해진 덫은 다시 밟아도 아무 일이 없다
+  const away = DS.DIRS.map(([dx, dy]) => ({ x: t.x + dx, y: t.y + dy })).find((q) => DS.isOpen(f, q.x, q.y));
+  G.dungeon.pos = { ...away }; G.char.player.pos = { ...away };
+  const n0 = G.dungeon.monsters.length;
+  DS.playerMove(G, t.x - away.x, t.y - away.y);
+  assert.strictEqual(G.dungeon.monsters.length, n0);
 });

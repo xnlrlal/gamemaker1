@@ -8,7 +8,7 @@ import os
 
 DEFAULT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "db.json")
 
-VALID_AI = ("highest_value", "attack_only", "random", "guard_when_hurt")
+VALID_AI = ("highest_value", "attack_only", "random", "guard_when_hurt", "flee_when_hurt")
 RACE_REQUIRED_STATS = ("spirit", "body", "mind", "psychic", "strength", "phys_res", "regen", "smell")
 
 

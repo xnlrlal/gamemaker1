@@ -80,6 +80,56 @@ DS.spawnCamps = function (floor) {
   return camps;
 };
 
+/** 고블린 덫(남쪽, 7-2): 고정 시드로 자리를 정한다. state: armed(숨어 있음) → sprung(고블린이 튀어나옴) → safe(그 고블린을 처치해 영구 안전). */
+DS.spawnTraps = function (floor) {
+  const cfg = DS.db.dungeon.floor1.traps;
+  const rng = DS.newRng(DS.db.dungeon.world_seed + 4242);
+  const pool = [];
+  floor.grid.forEach((row, y) => row.forEach((v, x) => {
+    if (v === 0 && DS.zoneAt(floor, x, y) === 'south' && Math.hypot(x - floor.start.x, y - floor.start.y) >= cfg.min_dist
+      && !floor.portals.some((q) => q.x === x && q.y === y)) pool.push({ x, y });
+  }));
+  const traps = [];
+  for (let tries = 0; traps.length < cfg.count && tries < 800 && pool.length; tries++) {
+    const t = DS.choice(rng, pool);
+    if (traps.some((o) => Math.hypot(o.x - t.x, o.y - t.y) < cfg.spacing)) continue;
+    traps.push({ id: traps.length, x: t.x, y: t.y, state: 'armed' });
+  }
+  return traps;
+};
+
+/** 덫 감지: 가까이(detect_radius) 가면 숨은 덫이 표시된다. 어두운 곳에서는 보이지 않는다. */
+DS.trapDetected = function (G, trap) {
+  const p = G.dungeon.pos;
+  return trap.state === 'armed' && Math.hypot(trap.x - p.x, trap.y - p.y) <= DS.db.dungeon.floor1.traps.detect_radius
+    && !DS.isDark(DS.getFloor(), p.x, p.y);
+};
+
+/** 덫을 밟으면 선택의 여지 없이 숨어 있던 고블린에게 기습당한다(플레이어는 한 턴 기절). 그날 무리 크기만큼 나온다. */
+function springTrap(G, trap) {
+  const d = G.dungeon, floor = DS.getFloor(), cfg = DS.db.dungeon.floor1, p = G.char.player;
+  trap.state = 'sprung';
+  const rng = DS.newRng(DS.db.dungeon.world_seed + 5151 * (trap.id + 1));
+  const occupied = new Set(d.monsters.filter((m) => m.alive).map((m) => m.pos.y * floor.width + m.pos.x));
+  occupied.add(p.pos.y * floor.width + p.pos.x);
+  const size = DS.groupSizeForDay(DS.dungeonDay(G));
+  for (let k = 0; k < size; k++) {
+    const near = [];
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+      const x = trap.x + dx, y = trap.y + dy;
+      if (DS.isOpen(floor, x, y) && Math.hypot(dx, dy) <= 2 && !occupied.has(y * floor.width + x)) near.push({ x, y });
+    }
+    if (!near.length) break;
+    const spot = DS.choice(rng, near);
+    occupied.add(spot.y * floor.width + spot.x);
+    const m = DS.makeMonster('goblin');
+    m.uid = 't' + trap.id + '_' + k; m.trap = trap.id;
+    m.pos = spot; m.alert = true; m.alert_turns = cfg.lose_sight_turns;
+    d.monsters.push(m);
+  }
+  G.msgs.push('덫이다! 숨어 있던 고블린이 덮친다. 당신은 잠시 정신을 잃는다.');
+}
+
 /** 미궁 n일째에 새로 만나는 무리의 크기(기획서 7-1: 첫날 단독 → 점차 늘어남). */
 DS.groupSizeForDay = function (day) {
   const arr = DS.db.dungeon.floor1.group_by_day;
@@ -186,12 +236,35 @@ function monsterChoose(G, m, p) {
   return { sid: best, self: false };
 }
 
+/** 체력이 바닥난 겁쟁이(고블린)는 플레이어에게서 멀어지는 칸으로 한 칸 도망친다. 막다른 곳이면 false(맞서 싸움). */
+function monsterFlee(G, ts, m, p) {
+  const floor = DS.getFloor();
+  const taken = new Set(G.dungeon.monsters.filter((o) => o.alive && o !== m).map((o) => o.pos.y * floor.width + o.pos.x));
+  taken.add(p.pos.y * floor.width + p.pos.x);
+  let best = null, bd = Math.hypot(m.pos.x - p.pos.x, m.pos.y - p.pos.y);
+  for (const [dx, dy] of DS.DIRS) {
+    const x = m.pos.x + dx, y = m.pos.y + dy;
+    if (!DS.isOpen(floor, x, y) || taken.has(y * floor.width + x)) continue;
+    const d = Math.hypot(x - p.pos.x, y - p.pos.y);
+    if (d > bd) { best = { x, y }; bd = d; }
+  }
+  if (!best) return false;
+  if (DS.rand(ts.rng) >= DS.db.rules.ai.flee_move_chance) { ts.log.push('T' + ts.round + ' ' + m.name + '이(가) 겁먹어 주춤거린다.'); return true; } // 다친 몸이라 매 턴 달아나지는 못한다
+  if (!m.fleeing) { m.fleeing = true; ts.log.push('T' + ts.round + ' ' + m.name + '이(가) 겁에 질려 도망친다!'); }
+  m.pos = best;
+  return true;
+}
+
 function monsterTurn(G, ts, m) {
   const floor = DS.getFloor(), cfg = DS.db.dungeon.floor1, p = G.char.player;
   const dist = Math.hypot(m.pos.x - p.pos.x, m.pos.y - p.pos.y);
   // 처음 눈치채는 건 둘러싼 8칸(aggro_radius) 안에 들어왔을 때뿐 — 멀리서 보이는 것만으로는 선공하지 않는다.
   // 한 번 눈치챈 뒤에는 시야 반경 안에서 시선이 닿는 동안 계속 쫓는다.
-  const near = Math.max(Math.abs(m.pos.x - p.pos.x), Math.abs(m.pos.y - p.pos.y)) <= cfg.aggro_radius;
+  // 어둠 속에서 강해지는 몬스터(고블린)는 암흑지역 칸에 서 있을 때 선공 범위와 능력치가 늘어난다.
+  const db = DS.db.monsters[m.id], dark = !!(db && db.dark_bonus && DS.isDark(floor, m.pos.x, m.pos.y));
+  m.env_bonus = dark ? db.dark_bonus.stats : null;
+  const aggro = cfg.aggro_radius + (dark ? db.dark_bonus.aggro_radius : 0);
+  const near = Math.max(Math.abs(m.pos.x - p.pos.x), Math.abs(m.pos.y - p.pos.y)) <= aggro;
   const sees = m.alert ? dist <= cfg.sight_radius && DS.hasLos(floor, m.pos, p.pos) : near;
   if (sees) {
     if (!m.alert) { ts.log.push('T' + ts.round + ' ' + m.name + '이(가) 당신을 발견했다!'); m.alert = true; }
@@ -203,6 +276,7 @@ function monsterTurn(G, ts, m) {
   if (!m.alert) return;
   m.shield = 0; // 방어막은 다음 자기 턴 시작까지 유지 [임시 규칙]
   if (m.stunned) { m.stunned = false; ts.log.push('T' + ts.round + ' ' + m.name + ' 기절로 행동 불가'); return; }
+  if (m.ai === 'flee_when_hurt' && m.hp < m.max_hp * DS.db.rules.ai.flee_hp_threshold && monsterFlee(G, ts, m, p)) return;
   const n = DS.actionCount(m); // 민첩성이 높을수록 한 턴에 여러 번 공격할 수 있다
   for (let i = 0; i < n && p.alive; i++) {
     const choice = monsterChoose(G, m, p);
@@ -223,7 +297,7 @@ function unitEndTurn(G, ts, c) {
     const e = c.status[sid];
     let dmg = e.stacks * st[sid].damage_per_stack;
     if (sid === 'poison') dmg *= Math.max(st.poison.min_factor, 1 - DS.effStat(c, st.poison.resist_stat) * st.poison.resist_per_point);
-    if (c.alive) {
+    if (c.alive && dmg > 0) {
       ts.log.push('T' + ts.round + ' ' + c.name + ' ' + (DS.db.status_names[sid] || sid) + ' 피해 ' + (Math.round(dmg * 10) / 10).toFixed(1));
       c.hp -= dmg;
       if (c.hp <= 0) { c.hp = 0; c.alive = false; ts.log.push('T' + ts.round + ' ' + c.name + ' 쓰러짐'); }
@@ -249,6 +323,9 @@ function reapKills(G) {
     }
   }
   d.monsters = d.monsters.filter((m) => m.alive);
+  for (const t of d.traps || []) {
+    if (t.state === 'sprung' && !d.monsters.some((m) => m.trap === t.id)) { t.state = 'safe'; G.msgs.push('덫에 숨어 있던 고블린을 처치했다. 이 덫은 이제 안전하다.'); }
+  }
 }
 
 /** 플레이어가 한 번 행동한 뒤의 세계: 적 행동 → 턴 종료 처리 → 사망·전투 종료 판정. */
@@ -287,7 +364,7 @@ function playerTurnStart(G) { G.char.player.shield = 0; }
 /** 보이는(밝은) 적인가: 시야 반경 안이고 시선이 닿을 때. */
 DS.canSee = function (G, m) {
   const floor = DS.getFloor(), p = G.char.player;
-  return Math.hypot(m.pos.x - p.pos.x, m.pos.y - p.pos.y) <= DS.db.dungeon.local_vision + 0.6 && DS.hasLos(floor, p.pos, m.pos);
+  return Math.hypot(m.pos.x - p.pos.x, m.pos.y - p.pos.y) <= DS.visionRadius(G) + 0.6 && DS.hasLos(floor, p.pos, m.pos);
 };
 
 /** 상하좌우로 한 칸 이동(적이 있으면 기본 공격). */
@@ -311,7 +388,13 @@ DS.playerMove = function (G, dx, dy) {
       if (msgs) G.msgs.push(...msgs, '2층은 아직 준비 중입니다.');
     }
   }
+  const trap = (d.traps || []).find((t) => t.state === 'armed' && t.x === x && t.y === y);
+  if (trap) springTrap(G, trap);
   DS.worldTick(G);
+  if (trap && G.screen === 'dungeon') {
+    tstate(G).log.push('T' + d.turn + ' ' + p.name + ' 기절로 행동 불가');
+    DS.worldTick(G); // 덫에 걸려 한 턴을 잃는다 — 고블린이 먼저 한 번 더 움직인다
+  }
   return { ok: true, moved: true };
 };
 

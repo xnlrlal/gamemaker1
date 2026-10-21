@@ -23,6 +23,10 @@ def eff_stat(c, stat):
             v += item["bonuses"].get(stat, 0)
     v += c["part_penalty"].get(stat, 0)
     v += c["vs_bonus"].get(stat, 0)
+    for e in c["status"].values():   # 마비 등 상태이상의 능력치 감소
+        pen = e.get("penalty")
+        if pen:
+            v += pen.get(stat, 0) * e["stacks"]
     return v
 
 
