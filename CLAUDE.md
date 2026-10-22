@@ -9,7 +9,8 @@
 - 구현 노트(임시 규칙·검증 결과·구조): `docs/implementation_notes.md` · 전체 흐름: `CHANGELOG.md`
 - 플레이 링크(비공개 Artifact): https://claude.ai/artifact/EESFTEzJU4qDhF1V7mYFCt — 갱신은 `Artifact` 도구로 같은 `file_path`(`web/dist/dungeon-stone.html`)를 다시 게시. 새 세션에서는 `url` 을 함께 넘기고 먼저 `read` 한다.
 
-## 현재 상태 (2026-10-21)
+## 현재 상태 (2026-10-22)
+- **DB 스탯 표 분리(2026-10-22)**: `races` 는 메인스탯(육체·정신·이능)만, 세부스탯(영혼력·근력·물리내성·자연재생·후각 등)은 `race_substats(race_id, stat_id, value)`(0 이 아닌 값만), 스탯 정의·분류는 `stats(id, name_ko, grp)` 표. db.json 모양은 그대로이고 export 가 같은 모양으로 조립한다. 몬스터 능력치(extra JSON)는 나중에 같은 방식으로 분리. 종족 수치 자체는 나중에 재검토(사용자 보류).
 - **고정 수치 DB(2026-10-21)**: db.json 과 같은 내용을 SQLite 표로 저장한 `data/dungeon_stone.db`(skills·races·items·monsters 는 개체별 표, 나머지는 `settings(path,value)` 점 경로). sim(`load_db`)·Node 테스트(`load.js`)·`web/build.py`(HTML 에 내용을 넣음; 브라우저는 SQLite 를 못 엶)는 이 DB 를 직접 읽는다(내보내기 로직은 `db_tool.export` 한 곳). 수치를 고칠 때는 db.json 을 고치고 `python3 scripts/db_tool.py build` 로 DB 를 다시 만든다(안 하면 테스트가 막음 — 게임은 DB 값을 쓰므로 build 전엔 수정이 반영되지 않는다).
 - **1층 몬스터 점검(2026-10-20)**: 지금 수치는 전부 **1레벨·정수 0개·첫 입장 기준**(정수로 물리내성이 오른 단계는 정수 구현 때 따로). 고블린은 4마리도 전 무기 100%라 현행 유지. 급소(즉사)는 9등급 근접이면 0% 이고 물리내성과 무관한데, 사용자 방향은 "물리내성이 관통력을 넘으면 면역, 관통하는 공격이면 죽는다(무적 방지 상한 없음)" → `docs/TODO.md` D7. **구울**은 힘 세고 빠르지만 둔하게(근력 3·민첩성 1·유연성 −8·명중률 −8, 1마리 72~100%) 재조정했다. **노움**은 단단하고 굼뜨고 약하게(근력 −2·물리내성 4·유연성 −5, 1마리 100%, 2마리 68~100%; 체형 설정 근거 없어 임시). **칼날늑대**는 늑대 특성(빠르고 잘 피함·한 방 약함·출혈)으로 근력 −2·민첩성 1·유연성 5 를 줬다(임시, 1마리 73~99%, 2마리 이상은 여전히 어려움 — D1~D3).
 - **고블린 특성(2026-10-20)**: 마비 상태 신설(스택당 명중률 −4·유연성 −4)과 고블린 스킬 독칼질(50% 마비), 체력 25% 미만이면 도주(`flee_when_hurt`, 매 턴 50% 로 달아남). 3마리 100%, 4마리 98~100%. 
@@ -54,7 +55,7 @@
 
 ## 명령어
 ```
-python3 -m unittest discover -s tests -t .          # Python 테스트(67)
+python3 -m unittest discover -s tests -t .          # Python 테스트(68)
 node --test web/tests/game.test.js                  # Node 테스트(40)
 node web/tests/parity.js                            # Python↔JS 승률 일치(10개 조합)
 node web/tests/groupsim.js goblin 1 2 3 4          # 지도 위 무리 전투 승률(무기 6종 × 무리 크기), 몬스터 id 는 db.json 키

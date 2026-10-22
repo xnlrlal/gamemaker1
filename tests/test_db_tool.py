@@ -27,6 +27,16 @@ class DbToolTest(unittest.TestCase):
         self.assertEqual(grade, db_tool.load_json()["monsters"]["goblin"]["grade"])
         self.assertEqual(json.loads(base), db_tool.load_json()["rules"]["hit"]["base"])
 
+    def test_race_stats_split_into_main_and_substats(self):
+        con = sqlite3.connect(db_tool.DB_PATH)
+        main = con.execute("SELECT body, mind, psychic FROM races WHERE id='barbarian'").fetchone()
+        subs = dict(con.execute("SELECT stat_id, value FROM race_substats WHERE race_id='barbarian'"))
+        grp, = con.execute("SELECT grp FROM stats WHERE id='strength'").fetchone()
+        con.close()
+        self.assertEqual(main, (25, 35, 1))
+        self.assertEqual(subs, {"spirit": 2, "strength": 3, "regen": 2})
+        self.assertEqual(grp, "body")
+
 
 if __name__ == "__main__":
     unittest.main()

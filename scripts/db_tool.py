@@ -5,6 +5,7 @@
     python3 scripts/db_tool.py check                # 커밋된 .db 가 db.json 과 같은 내용인지 점검
 
 표 구성: skills · races · items(무기·방어구) · monsters 는 개체별 표,
+stats(스탯 정의·분류) · race_substats(종족별 세부스탯, 0 이 아닌 값만),
 나머지(rules·dungeon·economy·progression·표시 이름 등)는 settings(path, value) 에
 'rules.hit.base' 같은 점 경로로 한 칸씩 저장한다. 리스트·빈 객체는 JSON 한 칸이다.
 db.json 에서 DB 로 갔다가 되돌려도 내용이 같다(키 순서는 ORDER 기준).
@@ -23,15 +24,22 @@ ORDER = ["meta", "status_names", "part_names", "stat_names", "zone_names", "dung
          "monster_defaults", "npcs"]
 ENTITY_KEYS = ("skills", "races", "monsters")
 RACE_STATS = ("spirit", "body", "mind", "psychic", "strength", "phys_res", "regen", "smell")
+MAIN_STATS = ("body", "mind", "psychic")
+# 스탯 분류(기획서 5-2): main = 메인스탯, 나머지는 세부스탯이 속한 메인스탯
+STAT_GROUPS = {"body": "main", "mind": "main", "psychic": "main",
+               "strength": "body", "phys_res": "body", "regen": "body", "smell": "body",
+               "accuracy": "body", "flexibility": "body", "agility": "body", "spirit": "psychic"}
 ITEM_GROUPS = ("weapons", "armor")
 
 SCHEMA = """
 CREATE TABLE settings (path TEXT PRIMARY KEY, seq INTEGER NOT NULL, value TEXT NOT NULL);
 CREATE TABLE skills (id TEXT PRIMARY KEY, seq INTEGER NOT NULL, name_ko TEXT NOT NULL, kind TEXT NOT NULL,
     cost INTEGER NOT NULL, cooldown INTEGER NOT NULL, power REAL, extra TEXT NOT NULL);
+CREATE TABLE stats (id TEXT PRIMARY KEY, seq INTEGER NOT NULL, name_ko TEXT NOT NULL, grp TEXT NOT NULL);
 CREATE TABLE races (id TEXT PRIMARY KEY, seq INTEGER NOT NULL, name_ko TEXT NOT NULL,
-    spirit REAL NOT NULL, body REAL NOT NULL, mind REAL NOT NULL, psychic REAL NOT NULL,
-    strength REAL NOT NULL, phys_res REAL NOT NULL, regen REAL NOT NULL, smell REAL NOT NULL);
+    body REAL NOT NULL, mind REAL NOT NULL, psychic REAL NOT NULL);
+CREATE TABLE race_substats (race_id TEXT NOT NULL REFERENCES races(id), stat_id TEXT NOT NULL REFERENCES stats(id),
+    value REAL NOT NULL, PRIMARY KEY (race_id, stat_id));
 CREATE TABLE items (id TEXT PRIMARY KEY, category TEXT NOT NULL, seq INTEGER NOT NULL, name_ko TEXT NOT NULL,
     desc TEXT NOT NULL, slot TEXT NOT NULL, bonuses TEXT NOT NULL, extra TEXT NOT NULL);
 CREATE TABLE monsters (id TEXT PRIMARY KEY, seq INTEGER NOT NULL, name_ko TEXT NOT NULL, grade INTEGER NOT NULL,
@@ -65,7 +73,7 @@ def build(db, path):
     con.executescript(SCHEMA)
     settings = []
     for key in ORDER:
-        if key in ENTITY_KEYS:
+        if key in ENTITY_KEYS or key == "stat_names":
             continue
         if key == "equipment":
             for k, v in db[key].items():
@@ -75,6 +83,10 @@ def build(db, path):
             flatten(key, db[key], settings)
     con.executemany("INSERT INTO settings VALUES (?,?,?)",
                     [(p, i, dumps(v)) for i, (p, v) in enumerate(settings)])
+    for i, (stat, name) in enumerate(db["stat_names"].items()):
+        if stat not in STAT_GROUPS:
+            raise ValueError("stat %s: no group in STAT_GROUPS" % stat)
+        con.execute("INSERT INTO stats VALUES (?,?,?,?)", (stat, i, name, STAT_GROUPS[stat]))
     for i, (sid, s) in enumerate(db["skills"].items()):
         extra = split(s, ("name_ko", "kind", "cost", "cooldown", "power"))
         con.execute("INSERT INTO skills VALUES (?,?,?,?,?,?,?,?)",
@@ -82,8 +94,10 @@ def build(db, path):
     for i, (rid, r) in enumerate(db["races"].items()):
         if set(r["stats"]) != set(RACE_STATS) or set(r) != {"name_ko", "stats"}:
             raise ValueError("race %s: unexpected fields" % rid)
-        con.execute("INSERT INTO races VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                    (rid, i, r["name_ko"]) + tuple(r["stats"][k] for k in RACE_STATS))
+        con.execute("INSERT INTO races VALUES (?,?,?,?,?,?)",
+                    (rid, i, r["name_ko"]) + tuple(r["stats"][k] for k in MAIN_STATS))
+        con.executemany("INSERT INTO race_substats VALUES (?,?,?)",
+                        [(rid, k, r["stats"][k]) for k in RACE_STATS if k not in MAIN_STATS and r["stats"][k]])
     for group in ITEM_GROUPS:
         for i, (iid, it) in enumerate(db["equipment"][group].items()):
             extra = split(it, ("name_ko", "desc", "slot", "bonuses"))
@@ -107,6 +121,7 @@ def export(path):
             node = node.setdefault(k, {})
         node[keys[-1]] = json.loads(v)
     db.setdefault("equipment", {})
+    db["stat_names"] = {sid: name for sid, name in con.execute("SELECT id, name_ko FROM stats ORDER BY seq")}
     skills = {}
     for sid, name, kind, cost, cd, power, extra in con.execute(
             "SELECT id, name_ko, kind, cost, cooldown, power, extra FROM skills ORDER BY seq"):
@@ -117,8 +132,10 @@ def export(path):
         s.update(json.loads(extra))
         skills[sid] = s
     races = {}
-    for row in con.execute("SELECT * FROM races ORDER BY seq"):
-        races[row[0]] = {"name_ko": row[2], "stats": {k: _num(v) for k, v in zip(RACE_STATS, row[3:])}}
+    for rid, name, *main in con.execute("SELECT id, name_ko, body, mind, psychic FROM races ORDER BY seq"):
+        stats = dict(zip(MAIN_STATS, main))
+        stats.update(con.execute("SELECT stat_id, value FROM race_substats WHERE race_id=?", (rid,)).fetchall())
+        races[rid] = {"name_ko": name, "stats": {k: _num(stats.get(k, 0)) for k in RACE_STATS}}
     for group in ITEM_GROUPS:
         items = {}
         for iid, name, desc, slot, bonuses, extra in con.execute(
