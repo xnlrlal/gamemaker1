@@ -37,6 +37,16 @@ class DbToolTest(unittest.TestCase):
         self.assertEqual(subs, {"spirit": 2, "strength": 3, "regen": 2})
         self.assertEqual(grp, "body")
 
+    def test_foreign_keys_hold_and_children_are_rows(self):
+        con = sqlite3.connect(db_tool.DB_PATH)
+        bad = con.execute("PRAGMA foreign_key_check").fetchall()
+        skills = [r[0] for r in con.execute("SELECT skill_id FROM monster_skills WHERE monster_id='goblin' ORDER BY seq")]
+        override = dict(con.execute("SELECT stat_id, value FROM monster_stats WHERE monster_id='goblin' AND kind='override'"))
+        con.close()
+        self.assertEqual(bad, [])
+        self.assertEqual(skills, ["poison_stab", "slash"])
+        self.assertEqual(override, {"strength": -8, "accuracy": -10})
+
 
 if __name__ == "__main__":
     unittest.main()
