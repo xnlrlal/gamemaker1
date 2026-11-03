@@ -10,6 +10,10 @@
     "strength": "근력", "phys_res": "물리내성", "regen": "자연재생", "accuracy": "명중률",
     "flexibility": "유연성", "agility": "민첩성", "spirit": "영혼력", "body": "육체", "mind": "정신", "psychic": "이능", "smell": "후각"
   },
+  "stat_groups": {
+    "strength": "body", "phys_res": "body", "regen": "body", "accuracy": "body", "flexibility": "body",
+    "agility": "body", "smell": "body", "spirit": "psychic", "body": "main", "mind": "main", "psychic": "main"
+  },
   "zone_names": { "north": "북", "east": "동", "south": "남", "west": "서", "center": "중심부" },
 
   "dungeon": {

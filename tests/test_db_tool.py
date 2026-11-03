@@ -27,15 +27,37 @@ class DbToolTest(unittest.TestCase):
         self.assertEqual(grade, db_tool.load_json()["monsters"]["goblin"]["grade"])
         self.assertEqual(json.loads(base), db_tool.load_json()["rules"]["hit"]["base"])
 
-    def test_race_stats_split_into_main_and_substats(self):
+    def test_race_stats_are_rows_and_main_stats_are_marked_by_group(self):
         con = sqlite3.connect(db_tool.DB_PATH)
-        main = con.execute("SELECT body, mind, psychic FROM races WHERE id='barbarian'").fetchone()
-        subs = dict(con.execute("SELECT stat_id, value FROM race_substats WHERE race_id='barbarian'"))
-        grp, = con.execute("SELECT grp FROM stats WHERE id='strength'").fetchone()
+        stats = dict(con.execute("SELECT stat_id, value FROM race_stats WHERE race_id='barbarian'"))
+        main = {r[0] for r in con.execute("SELECT id FROM stats WHERE grp='main'")}
         con.close()
-        self.assertEqual(main, (25, 35, 1))
-        self.assertEqual(subs, {"spirit": 2, "strength": 3, "regen": 2})
-        self.assertEqual(grp, "body")
+        self.assertEqual((stats["body"], stats["mind"], stats["psychic"], stats["strength"]), (25, 35, 1, 3))
+        self.assertEqual(main, {"body", "mind", "psychic"})
+
+    def test_unknown_fields_are_kept_without_schema_changes(self):
+        db = db_tool.load_json()
+        db["stat_names"]["sight"] = "시각"
+        db["stat_groups"]["sight"] = "body"
+        db["races"]["human"]["stats"]["sight"] = 2
+        db["races"]["human"]["lore"] = {"origin": "평원"}
+        db["skills"]["slash"]["element"] = "none"
+        db["skills"]["slash"]["tags"] = ["melee", "basic"]
+        db["skills"]["pierce"]["on_hit"][0]["note"] = "x"
+        db["rules"]["status"]["bleed"]["heal_block"] = True
+        db["rules"]["status"]["poison"]["stat_penalty"] = {"sight": -1}
+        db["monsters"]["goblin"]["night_bonus"] = {"aggro_radius": 2, "stats": {"accuracy": 3}}
+        db["monsters"]["goblin"]["loot"] = ["tooth", "ear"]
+        db["equipment"]["armor"]["sandals"]["weight"] = 1.5
+        db["equipment"]["barbarian_charm"] = ["lucky"]
+        db["npcs"]["wanderer"]["greeting"] = "안녕"
+        db["new_section"] = {"a": {"b": [1, 2]}, "c": 3}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "t.db")
+            db_tool.build(db, path)
+            out = db_tool.export(path)
+        self.assertEqual(out, db)
+        self.assertEqual(json.dumps(out, sort_keys=True), json.dumps(db, sort_keys=True))
 
     def test_foreign_keys_hold_and_children_are_rows(self):
         con = sqlite3.connect(db_tool.DB_PATH)
